@@ -1,4 +1,4 @@
-# Anton
+# local-slm-playwriting
 
 Local SLM-based multi-agent system for generating theatre plays.
 
