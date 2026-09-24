@@ -10,7 +10,7 @@ describe("cast reducer", () => {
     expect(initialState.screen).toBe("prompt");
     expect(initialState.premise).toMatch(/^An independent theatre in Vienna/);
     expect(initialState.cast).toEqual([]);
-    expect(initialState.chatOpen).toBe(true);
+    expect(initialState.chatOpen).toBe(false);
   });
 
   it("replaces the cast on generation and resets chats", () => {
@@ -58,7 +58,16 @@ describe("cast reducer", () => {
   });
 
   it("toggles the chat panel", () => {
-    expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
+    expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(true);
+  });
+
+  it("opens a character from the grid with the chat closed, and keeps it while stepping", () => {
+    const state = { ...initialState, cast: [character("a"), character("b")], chatOpen: true };
+    const opened = reducer(state, { type: "openCharacter", index: 1 });
+    expect(opened.chatOpen).toBe(false);
+    const toggled = reducer(opened, { type: "toggleChat" });
+    expect(reducer(toggled, { type: "stepCharacter", delta: 1 }).chatOpen).toBe(true);
+    expect(reducer(state, { type: "characterAdded", character: character("c"), card: BLANK_CARD }).chatOpen).toBe(false);
   });
 
   it("adds the user message, then applies only the AI's changed fields and highlights them", () => {

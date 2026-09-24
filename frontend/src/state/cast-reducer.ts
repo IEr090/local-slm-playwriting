@@ -11,6 +11,7 @@ export interface CastState {
   cast: Character[];
   cards: Record<string, CharacterCard>;
   selectedIndex: number;
+  /** AI chat panel; closed whenever a character is opened from the grid (toggle in the header). */
   chatOpen: boolean;
   chats: Record<string, ChatMessage[]>;
   draft: string;
@@ -32,7 +33,7 @@ export const initialState: CastState = {
   cast: [],
   cards: {},
   selectedIndex: 0,
-  chatOpen: true,
+  chatOpen: false,
   chats: {},
   draft: "",
   aiTypingFor: null,
@@ -88,10 +89,11 @@ export function reducer(state: CastState, action: Action): CastState {
         cards: { ...state.cards, [action.character.id]: action.card },
         selectedIndex: state.cast.length,
         draft: "",
+        chatOpen: false,
         screen: "detail",
       };
     case "openCharacter":
-      return { ...state, selectedIndex: action.index, draft: "", screen: "detail" };
+      return { ...state, selectedIndex: action.index, draft: "", chatOpen: false, screen: "detail" };
     case "showError":
       return { ...state, error: action.error };
     case "dismissError":
