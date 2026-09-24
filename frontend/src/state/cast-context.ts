@@ -1,6 +1,7 @@
 // Contexts and hooks for reading the store and calling its actions.
 
 import { createContext, useContext } from "react";
+import type { Character } from "@/types/character";
 import type { CastState, Screen } from "./cast-reducer";
 
 export interface CastActions {
@@ -13,6 +14,13 @@ export interface CastActions {
   dismissError(): void;
   /** Shows the "Continue" toast for 3 s. */
   showToast(): void;
+  /** Inline edit of one character (every field is always editable). */
+  updateCharacter(id: string, patch: Partial<Omit<Character, "id">>): void;
+  /** Previous / next character, wrapping around. */
+  stepCharacter(delta: 1 | -1): void;
+  /** "ALL CHARACTERS": back to the grid (auto-save hooks in here in block 8). */
+  leaveToGrid(): void;
+  toggleChat(): void;
 }
 
 export const StateContext = createContext<CastState | null>(null);

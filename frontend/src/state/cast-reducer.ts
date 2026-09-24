@@ -44,7 +44,10 @@ export type Action =
   | { type: "openCharacter"; index: number }
   | { type: "showError"; error: ApiErrorInfo }
   | { type: "dismissError" }
-  | { type: "setToast"; open: boolean };
+  | { type: "setToast"; open: boolean }
+  | { type: "updateCharacter"; id: string; patch: Partial<Omit<Character, "id">> }
+  | { type: "stepCharacter"; delta: 1 | -1 }
+  | { type: "toggleChat" };
 
 export function reducer(state: CastState, action: Action): CastState {
   switch (action.type) {
@@ -79,5 +82,17 @@ export function reducer(state: CastState, action: Action): CastState {
       return { ...state, error: null };
     case "setToast":
       return { ...state, toast: action.open };
+    case "updateCharacter":
+      return {
+        ...state,
+        cast: state.cast.map((c) => (c.id === action.id ? { ...c, ...action.patch } : c)),
+      };
+    case "stepCharacter": {
+      const n = state.cast.length;
+      if (!n) return state;
+      return { ...state, selectedIndex: (state.selectedIndex + action.delta + n) % n, draft: "" };
+    }
+    case "toggleChat":
+      return { ...state, chatOpen: !state.chatOpen };
   }
 }

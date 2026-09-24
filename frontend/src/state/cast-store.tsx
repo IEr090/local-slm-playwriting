@@ -70,6 +70,10 @@ export function CastProvider({ children }: { children: ReactNode }) {
       openCharacter: (index) => dispatch({ type: "openCharacter", index }),
       dismissError: () => dispatch({ type: "dismissError" }),
       showToast,
+      updateCharacter: (id, patch) => dispatch({ type: "updateCharacter", id, patch }),
+      stepCharacter: (delta) => dispatch({ type: "stepCharacter", delta }),
+      leaveToGrid: () => dispatch({ type: "setScreen", screen: "grid" }),
+      toggleChat: () => dispatch({ type: "toggleChat" }),
     }),
     [startGeneration, cancelGeneration, addBlank, showToast],
   );

@@ -6,7 +6,7 @@ import { PromptScreen } from "@/components/screens/prompt/PromptScreen";
 import { useCastState } from "@/state/cast-context";
 import type { Screen } from "@/state/cast-reducer";
 
-const SCREENS: Record<Screen, () => React.JSX.Element> = {
+const SCREENS: Record<Screen, () => React.JSX.Element | null> = {
   prompt: PromptScreen,
   generating: GeneratingScreen,
   grid: GridScreen,

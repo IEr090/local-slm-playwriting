@@ -41,4 +41,23 @@ describe("cast reducer", () => {
     expect(shown.toast).toBe(true);
     expect(reducer(shown, { type: "setScreen", screen: "prompt" }).toast).toBe(false);
   });
+
+  it("updates one character by id", () => {
+    const state = { ...initialState, cast: [character("a"), character("b")] };
+    const after = reducer(state, { type: "updateCharacter", id: "b", patch: { name: "Bea", age: 40 } });
+    expect(after.cast[1]).toMatchObject({ id: "b", name: "Bea", age: 40 });
+    expect(after.cast[0]).toBe(state.cast[0]);
+  });
+
+  it("steps through characters with wrap-around and clears the chat draft", () => {
+    const state = { ...initialState, cast: [character("a"), character("b"), character("c")], draft: "x" };
+    expect(reducer(state, { type: "stepCharacter", delta: -1 }).selectedIndex).toBe(2);
+    const next = reducer({ ...state, selectedIndex: 2 }, { type: "stepCharacter", delta: 1 });
+    expect(next.selectedIndex).toBe(0);
+    expect(next.draft).toBe("");
+  });
+
+  it("toggles the chat panel", () => {
+    expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
+  });
 });
