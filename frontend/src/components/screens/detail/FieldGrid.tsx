@@ -5,6 +5,7 @@ import {
   GENDER_LABEL,
   roleLabel,
   type Character,
+  type CharacterCard,
 } from "@/types/character";
 import { FieldCard } from "./FieldCard";
 import { RelationshipsField } from "./fields/RelationshipsField";
@@ -16,6 +17,7 @@ type Patch = Partial<Omit<Character, "id">>;
 interface FieldGridProps {
   character: Character;
   cast: Character[];
+  cards: Record<string, CharacterCard>;
   onChange(patch: Patch): void;
   /** Fields to glow after an AI revision. */
   highlighted?: readonly (keyof Character)[];
@@ -26,7 +28,7 @@ type TextKey = {
 }[keyof Character];
 
 /** The 16 always-editable field cards in two sections (README §4.4). */
-export function FieldGrid({ character: c, cast, onChange, highlighted = [] }: FieldGridProps) {
+export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [] }: FieldGridProps) {
   const text = (key: TextKey, num: number, label: string, rows: number, span: 2 | 4, hint?: string) => (
     <FieldCard
       num={num}
@@ -130,8 +132,10 @@ export function FieldGrid({ character: c, cast, onChange, highlighted = [] }: Fi
         className="col-span-4"
       >
         <RelationshipsField
+          selfId={c.id}
           relationships={c.relationships}
           cast={cast}
+          cards={cards}
           onChange={(relationships) => onChange({ relationships })}
         />
       </FieldCard>

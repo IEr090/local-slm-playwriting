@@ -5,7 +5,7 @@ import { FieldGrid } from "./FieldGrid";
 
 /** Screen 3 — character detail: live header + scrollable field cards (README §4.4). */
 export function DetailScreen() {
-  const { cast, selectedIndex, chatOpen } = useCastState();
+  const { cast, cards, selectedIndex, chatOpen } = useCastState();
   const { updateCharacter, stepCharacter, leaveToGrid, toggleChat } = useCastActions();
   const character = cast[Math.min(selectedIndex, cast.length - 1)];
   if (!character) return null;
@@ -31,6 +31,7 @@ export function DetailScreen() {
             key={character.id}
             character={character}
             cast={cast}
+            cards={cards}
             onChange={(patch) => updateCharacter(character.id, patch)}
           />
         </motion.div>
