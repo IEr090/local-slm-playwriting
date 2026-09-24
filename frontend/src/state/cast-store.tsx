@@ -60,6 +60,26 @@ export function CastProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "characterAdded", character, card });
   }, []);
 
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(highlightTimer.current), []);
+
+  const sendRevision = useCallback(async () => {
+    const { draft, cast, selectedIndex, aiTypingFor } = stateRef.current;
+    const text = draft.trim();
+    const character = cast[selectedIndex];
+    if (!text || !character || aiTypingFor) return;
+    dispatch({ type: "revisionRequested", id: character.id, text });
+    try {
+      const result = await api.reviseCharacter(character, text);
+      dispatch({ type: "revisionAnswered", id: character.id, result });
+      clearTimeout(highlightTimer.current);
+      highlightTimer.current = setTimeout(() => dispatch({ type: "clearHighlight" }), 2400);
+    } catch (error) {
+      dispatch({ type: "revisionFailed", id: character.id });
+      dispatch({ type: "showError", error: toErrorInfo(error) });
+    }
+  }, []);
+
   const actions = useMemo<CastActions>(
     () => ({
       setPremise: (premise) => dispatch({ type: "setPremise", premise }),
@@ -74,8 +94,10 @@ export function CastProvider({ children }: { children: ReactNode }) {
       stepCharacter: (delta) => dispatch({ type: "stepCharacter", delta }),
       leaveToGrid: () => dispatch({ type: "setScreen", screen: "grid" }),
       toggleChat: () => dispatch({ type: "toggleChat" }),
+      setDraft: (draft) => dispatch({ type: "setDraft", draft }),
+      sendRevision,
     }),
-    [startGeneration, cancelGeneration, addBlank, showToast],
+    [startGeneration, cancelGeneration, addBlank, showToast, sendRevision],
   );
 
   return (

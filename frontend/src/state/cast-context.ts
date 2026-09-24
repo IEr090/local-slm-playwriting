@@ -21,6 +21,9 @@ export interface CastActions {
   /** "ALL CHARACTERS": back to the grid (auto-save hooks in here in block 8). */
   leaveToGrid(): void;
   toggleChat(): void;
+  setDraft(draft: string): void;
+  /** Sends the draft to the AI for the open character (Enter / send button). */
+  sendRevision(): Promise<void>;
 }
 
 export const StateContext = createContext<CastState | null>(null);

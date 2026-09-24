@@ -1,7 +1,7 @@
 // App state shape and reducer. Pure — no api calls here.
 
 import { DEFAULT_PREMISE } from "@/api/mock-data";
-import type { ApiErrorInfo, Character, CharacterCard, ChatMessage } from "@/types/character";
+import type { ApiErrorInfo, Character, CharacterCard, ChatMessage, RevisionResult } from "@/types/character";
 
 export type Screen = "prompt" | "generating" | "grid" | "detail";
 
@@ -14,7 +14,10 @@ export interface CastState {
   chatOpen: boolean;
   chats: Record<string, ChatMessage[]>;
   draft: string;
-  aiTyping: boolean;
+  /** Id of the character the AI is currently answering for (typing indicator), or null. */
+  aiTypingFor: string | null;
+  /** Fields that glow for a moment after an AI revision. */
+  highlight: { id: string; fields: (keyof Character)[] } | null;
   /** Ids of characters whose card is being regenerated. */
   updating: string[];
   error: ApiErrorInfo | null;
@@ -30,7 +33,8 @@ export const initialState: CastState = {
   chatOpen: true,
   chats: {},
   draft: "",
-  aiTyping: false,
+  aiTypingFor: null,
+  highlight: null,
   updating: [],
   error: null,
   toast: false,
@@ -47,7 +51,12 @@ export type Action =
   | { type: "setToast"; open: boolean }
   | { type: "updateCharacter"; id: string; patch: Partial<Omit<Character, "id">> }
   | { type: "stepCharacter"; delta: 1 | -1 }
-  | { type: "toggleChat" };
+  | { type: "toggleChat" }
+  | { type: "setDraft"; draft: string }
+  | { type: "revisionRequested"; id: string; text: string }
+  | { type: "revisionAnswered"; id: string; result: RevisionResult }
+  | { type: "revisionFailed"; id: string }
+  | { type: "clearHighlight" };
 
 export function reducer(state: CastState, action: Action): CastState {
   switch (action.type) {
@@ -94,5 +103,36 @@ export function reducer(state: CastState, action: Action): CastState {
     }
     case "toggleChat":
       return { ...state, chatOpen: !state.chatOpen };
+    case "setDraft":
+      return { ...state, draft: action.draft };
+    case "revisionRequested":
+      return {
+        ...state,
+        draft: "",
+        aiTypingFor: action.id,
+        chats: { ...state.chats, [action.id]: [...(state.chats[action.id] ?? []), { role: "user", text: action.text }] },
+      };
+    case "revisionAnswered": {
+      const { result } = action;
+      // apply only the fields the AI changed, so edits made while it was typing survive
+      const patch = Object.fromEntries(result.changed_fields.map((f) => [f, result.character[f]]));
+      return {
+        ...state,
+        aiTypingFor: null,
+        cast: state.cast.map((c) => (c.id === action.id ? { ...c, ...patch, id: c.id } : c)),
+        chats: {
+          ...state.chats,
+          [action.id]: [
+            ...(state.chats[action.id] ?? []),
+            { role: "ai", decision: result.decision, changed_fields: result.changed_fields, text: result.text },
+          ],
+        },
+        highlight: result.changed_fields.length ? { id: action.id, fields: result.changed_fields } : state.highlight,
+      };
+    }
+    case "revisionFailed":
+      return { ...state, aiTypingFor: state.aiTypingFor === action.id ? null : state.aiTypingFor };
+    case "clearHighlight":
+      return { ...state, highlight: null };
   }
 }

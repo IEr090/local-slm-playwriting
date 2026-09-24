@@ -1,12 +1,13 @@
 import { motion } from "motion/react";
 import { useCastActions, useCastState } from "@/state/cast-context";
+import { ChatPanel } from "./chat/ChatPanel";
 import { DetailHeader } from "./DetailHeader";
 import { FieldGrid } from "./FieldGrid";
 
 /** Screen 3 — character detail: live header + scrollable field cards (README §4.4). */
 export function DetailScreen() {
-  const { cast, cards, selectedIndex, chatOpen } = useCastState();
-  const { updateCharacter, stepCharacter, leaveToGrid, toggleChat } = useCastActions();
+  const { cast, cards, selectedIndex, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();
+  const { updateCharacter, stepCharacter, leaveToGrid, toggleChat, setDraft, sendRevision } = useCastActions();
   const character = cast[Math.min(selectedIndex, cast.length - 1)];
   if (!character) return null;
 
@@ -33,10 +34,19 @@ export function DetailScreen() {
             cast={cast}
             cards={cards}
             onChange={(patch) => updateCharacter(character.id, patch)}
+            highlighted={highlight?.id === character.id ? highlight.fields : undefined}
           />
         </motion.div>
       </div>
-      {/* chat panel "ASK AI TO REVISE" arrives in block 6 */}
+      <ChatPanel
+        open={chatOpen}
+        characterName={character.name || "this character"}
+        messages={chats[character.id] ?? []}
+        typing={aiTypingFor === character.id}
+        draft={draft}
+        onDraftChange={setDraft}
+        onSend={() => void sendRevision()}
+      />
     </div>
   );
 }

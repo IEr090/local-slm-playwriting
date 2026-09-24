@@ -60,4 +60,36 @@ describe("cast reducer", () => {
   it("toggles the chat panel", () => {
     expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
   });
+
+  it("adds the user message, then applies only the AI's changed fields and highlights them", () => {
+    const elena = { ...character("elena"), personality: "Calm.", goal: "Old goal" } as Character;
+    let state = { ...initialState, cast: [elena], draft: "make her cynical" };
+    state = reducer(state, { type: "revisionRequested", id: "elena", text: "make her cynical" });
+    expect(state.draft).toBe("");
+    expect(state.aiTypingFor).toBe("elena");
+    expect(state.chats.elena).toEqual([{ role: "user", text: "make her cynical" }]);
+
+    // the user edits the goal while the AI is typing
+    state = reducer(state, { type: "updateCharacter", id: "elena", patch: { goal: "New goal" } });
+    state = reducer(state, {
+      type: "revisionAnswered",
+      id: "elena",
+      result: {
+        decision: "accept_with_adjustments",
+        changed_fields: ["personality"],
+        character: { ...elena, personality: "Calm. Revised: Cynical." },
+        text: "done",
+      },
+    });
+    expect(state.aiTypingFor).toBeNull();
+    expect(state.cast[0]).toMatchObject({ personality: "Calm. Revised: Cynical.", goal: "New goal" });
+    expect(state.chats.elena[1]).toMatchObject({ role: "ai", decision: "accept_with_adjustments", changed_fields: ["personality"] });
+    expect(state.highlight).toEqual({ id: "elena", fields: ["personality"] });
+    expect(reducer(state, { type: "clearHighlight" }).highlight).toBeNull();
+  });
+
+  it("stops the typing indicator when the revision fails", () => {
+    const state = reducer({ ...initialState, cast: [character("a")] }, { type: "revisionRequested", id: "a", text: "x" });
+    expect(reducer(state, { type: "revisionFailed", id: "a" }).aiTypingFor).toBeNull();
+  });
 });
