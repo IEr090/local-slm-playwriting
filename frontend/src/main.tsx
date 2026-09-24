@@ -10,9 +10,12 @@ import '@fontsource/jost/400.css'
 import '@fontsource/jost/500.css'
 import './index.css'
 import App from './App.tsx'
+import { CastProvider } from './state/cast-store'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <CastProvider>
+      <App />
+    </CastProvider>
   </StrictMode>,
 )
