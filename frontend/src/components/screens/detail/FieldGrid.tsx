@@ -43,26 +43,27 @@ export function FieldGrid({ character: c, cast, onChange, highlighted = [] }: Fi
     <div className="grid grid-cols-4 gap-3">
       <SectionHeading numeral="I" title="BASIC PROFILE" />
 
-      {/* Row 1 on one line: Name · Surname · Age · Gender */}
-      <div className="col-span-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_92px_auto] gap-3">
-        <FieldCard num={1} label="Name" compact>
-          <SerifInput
-            aria-label="Name"
-            size={8}
-            placeholder="First name"
-            value={c.name}
-            onChange={(e) => onChange({ name: e.target.value })}
-          />
-        </FieldCard>
-        <FieldCard num={2} label="Surname" compact>
-          <SerifInput
-            aria-label="Surname"
-            size={8}
-            placeholder="Surname"
-            value={c.surname}
-            onChange={(e) => onChange({ surname: e.target.value })}
-          />
-        </FieldCard>
+      {/* Row 1 on one line. Name · Surname fill exactly the left column (same edges as field 5);
+          Age (narrow) · Gender fill the right column. */}
+      <FieldCard num={1} label="Name" compact>
+        <SerifInput
+          aria-label="Name"
+          size={8}
+          placeholder="First name"
+          value={c.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+      </FieldCard>
+      <FieldCard num={2} label="Surname" compact>
+        <SerifInput
+          aria-label="Surname"
+          size={8}
+          placeholder="Surname"
+          value={c.surname}
+          onChange={(e) => onChange({ surname: e.target.value })}
+        />
+      </FieldCard>
+      <div className="col-span-2 grid grid-cols-[92px_minmax(0,1fr)] gap-3">
         <FieldCard num={3} label="Age" compact>
           <SerifInput
             aria-label="Age"
