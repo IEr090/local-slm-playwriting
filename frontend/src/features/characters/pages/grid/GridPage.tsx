@@ -1,12 +1,17 @@
+import { useEffect, useRef, useState } from "react";
 import { Pill, GoldPill } from "@/shared/ui/Pill";
 import { Toast } from "@/shared/ui/Toast";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
 import { CharacterCardView } from "./CharacterCardView";
 
-/** Screen 2 — the cast grid "Dramatis Personae" (README §4.3). */
-export function GridScreen() {
-  const { cast, cards, toast, updating } = useCastState();
-  const { goTo, addBlank, openCharacter, showToast } = useCastActions();
+/** "Continue" toast: shown for 3 s. */
+const TOAST_MS = 3000;
+
+/** Page "/cast" — the cast grid "Dramatis Personae" (README §4.3). */
+export function GridPage() {
+  const { cast, cards, updating } = useCastState();
+  const { newPremise, addBlank, openCharacter } = useCastActions();
+  const [toast, showToast] = useTimedFlag(TOAST_MS);
 
   return (
     <div className="absolute inset-0">
@@ -15,7 +20,7 @@ export function GridScreen() {
       <div className="relative flex items-end justify-between px-16 pt-11">
         <h1 className="m-0 font-serif text-[44px] font-medium">Dramatis Personae</h1>
         <div className="flex items-center gap-[14px]">
-          <Pill onClick={() => goTo("prompt")}>← New premise</Pill>
+          <Pill onClick={newPremise}>← New premise</Pill>
           <Pill onClick={() => void addBlank()}>+ Add character</Pill>
           <GoldPill onClick={showToast} className="px-5 py-[10px] text-xs tracking-[1px]">
             Continue →
@@ -35,7 +40,7 @@ export function GridScreen() {
             card={cards[character.id]}
             number={i + 1}
             updating={updating.includes(character.id)}
-            onOpen={() => openCharacter(i)}
+            onOpen={() => openCharacter(character.id)}
           />
         ))}
       </div>
@@ -43,4 +48,17 @@ export function GridScreen() {
       <Toast open={toast}>Cast approved. Next stage — Plot — arrives in Milestone 3.</Toast>
     </div>
   );
+}
+
+/** A flag that turns itself off after `ms`; calling `show` again restarts the timer. */
+function useTimedFlag(ms: number): [boolean, () => void] {
+  const [on, setOn] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const show = () => {
+    clearTimeout(timer.current);
+    setOn(true);
+    timer.current = setTimeout(() => setOn(false), ms);
+  };
+  return [on, show];
 }

@@ -6,8 +6,9 @@ import { initialState, reducer } from "./cast-reducer";
 const character = (id: string) => ({ id, name: id, surname: "", relationships: [] }) as unknown as Character;
 
 describe("cast reducer", () => {
-  it("starts on the prompt screen with the prototype premise and an empty cast", () => {
-    expect(initialState.screen).toBe("prompt");
+  it("starts with the prototype premise, an empty cast, nothing loaded and no generation", () => {
+    expect(initialState.loaded).toBe(false);
+    expect(initialState.generation).toBe("idle");
     expect(initialState.premise).toMatch(/^An independent theatre in Vienna/);
     expect(initialState.cast).toEqual([]);
     expect(initialState.chatOpen).toBe(false);
@@ -20,26 +21,21 @@ describe("cast reducer", () => {
     expect(after.chats).toEqual({});
   });
 
-  it("appends a blank character and opens it", () => {
+  it("appends a blank character with its card and snapshot", () => {
     const withTwo = { ...initialState, cast: [character("a"), character("b")] };
     const after = reducer(withTwo, { type: "characterAdded", character: character("new"), card: BLANK_CARD });
-    expect(after.cast).toHaveLength(3);
-    expect(after.selectedIndex).toBe(2);
-    expect(after.screen).toBe("detail");
+    expect(after.cast.map((c) => c.id)).toEqual(["a", "b", "new"]);
     expect(after.cards.new).toEqual(BLANK_CARD);
+    expect(after.cardSnapshot.new).toBeDefined();
   });
 
-  it("shows and dismisses an error", () => {
-    const error = { message: "m", detail: "d" };
-    const shown = reducer(initialState, { type: "showError", error });
-    expect(shown.error).toEqual(error);
-    expect(reducer(shown, { type: "dismissError" }).error).toBeNull();
-  });
-
-  it("hides the toast when the screen changes", () => {
-    const shown = reducer(initialState, { type: "setToast", open: true });
-    expect(shown.toast).toBe(true);
-    expect(reducer(shown, { type: "setScreen", screen: "prompt" }).toast).toBe(false);
+  it("loads the saved cast once, but never over a cast that is already there", () => {
+    const loaded = reducer(initialState, { type: "castLoaded", characters: [character("a")], cards: { a: BLANK_CARD } });
+    expect(loaded.loaded).toBe(true);
+    expect(loaded.cast.map((c) => c.id)).toEqual(["a"]);
+    const generated = reducer(initialState, { type: "castGenerated", characters: [character("new")], cards: { new: BLANK_CARD } });
+    const late = reducer(generated, { type: "castLoaded", characters: [character("old")], cards: { old: BLANK_CARD } });
+    expect(late.cast.map((c) => c.id)).toEqual(["new"]);
   });
 
   it("updates one character by id", () => {
@@ -53,11 +49,9 @@ describe("cast reducer", () => {
     expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(true);
   });
 
-  it("opens a character from the grid (or a new one) with the chat closed", () => {
-    const state = { ...initialState, cast: [character("a"), character("b")], chatOpen: true };
-    const opened = reducer(state, { type: "openCharacter", index: 1 });
-    expect(opened.chatOpen).toBe(false);
-    expect(reducer(state, { type: "characterAdded", character: character("c"), card: BLANK_CARD }).chatOpen).toBe(false);
+  it("opens a character with the chat closed and an empty draft", () => {
+    const state = { ...initialState, chatOpen: true, draft: "half-typed" };
+    expect(reducer(state, { type: "characterOpened" })).toMatchObject({ chatOpen: false, draft: "" });
   });
 
   it("adds the user message, then applies only the AI's changed fields and highlights them", () => {
@@ -92,11 +86,12 @@ describe("cast reducer", () => {
     expect(reducer(state, { type: "revisionFailed", id: "a" }).aiTypingFor).toBeNull();
   });
 
-  it("marks the generation ready without leaving the generating screen", () => {
-    const started = reducer({ ...initialState, error: { message: "m", detail: "d" } }, { type: "generationStarted" });
-    expect(started).toMatchObject({ screen: "generating", generationReady: false, error: null });
+  it("runs a generation: running → ready (cast arrives) → idle", () => {
+    const started = reducer(initialState, { type: "generationStarted" });
+    expect(started.generation).toBe("running");
     const done = reducer(started, { type: "castGenerated", characters: [character("a")], cards: { a: BLANK_CARD } });
-    expect(done).toMatchObject({ screen: "generating", generationReady: true });
+    expect(done).toMatchObject({ generation: "ready", loaded: true });
+    expect(reducer(done, { type: "generationEnded" }).generation).toBe("idle");
   });
 
   describe("auto-save and card update", () => {

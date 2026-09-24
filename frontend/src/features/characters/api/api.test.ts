@@ -174,3 +174,19 @@ describe("?fail=…", () => {
     expect((error as ApiError).detail).toContain("localhost:11434");
   });
 });
+
+describe("getCast", () => {
+  it("returns the saved cast with the latest cards and saved edits", async () => {
+    const { characters } = await api.generateCast(DEFAULT_PREMISE);
+    await api.saveCharacter({ ...characters[1], name: "Marek" });
+    const card = await api.generateCard({ ...characters[1], dramatic_role: "mentor" });
+    const { character: blank } = await api.createBlankCharacter();
+
+    const saved = await api.getCast();
+    expect(saved.characters).toHaveLength(7);
+    expect(saved.characters[1].name).toBe("Marek");
+    expect(saved.cards[characters[1].id]).toEqual(card);
+    expect(saved.characters.at(-1)?.id).toBe(blank.id);
+    expect(saved.cards[blank.id]).toEqual(BLANK_CARD);
+  });
+});

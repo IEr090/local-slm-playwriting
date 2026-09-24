@@ -1,15 +1,27 @@
 import { motion } from "motion/react";
+import { useEffect } from "react";
+import { Navigate, useParams } from "react-router";
+import { paths } from "@/features/characters/paths";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
 import { ChatPanel } from "./chat/ChatPanel";
 import { DetailHeader } from "./DetailHeader";
 import { FieldGrid } from "./FieldGrid";
 
-/** Screen 3 — character detail: live header + scrollable field cards (README §4.4). */
-export function DetailScreen() {
-  const { cast, cards, selectedIndex, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();
-  const { updateCharacter, leaveToGrid, toggleChat, setDraft, sendRevision } = useCastActions();
-  const character = cast[Math.min(selectedIndex, cast.length - 1)];
-  if (!character) return null;
+/** Page "/cast/:id" — character detail: live header + scrollable field cards (README §4.4). */
+export function DetailPage() {
+  const { id = "" } = useParams();
+  const { loaded, cast, cards, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();
+  const { characterOpened, updateCharacter, leaveToGrid, toggleChat, setDraft, sendRevision } = useCastActions();
+  const index = cast.findIndex((c) => c.id === id);
+  const character = cast[index];
+
+  // a (new) character is shown: empty chat draft, chat panel closed
+  useEffect(() => {
+    characterOpened();
+  }, [id, characterOpened]);
+
+  if (!loaded) return null; // the saved cast is still being read after a reload
+  if (!character) return <Navigate to={paths.cast} replace />;
 
   return (
     <div className="absolute inset-0 flex">
@@ -18,7 +30,7 @@ export function DetailScreen() {
 
         <DetailHeader
           character={character}
-          index={selectedIndex}
+          index={index}
           total={cast.length}
           chatOpen={chatOpen}
           onAll={leaveToGrid}
@@ -43,7 +55,7 @@ export function DetailScreen() {
         typing={aiTypingFor === character.id}
         draft={draft}
         onDraftChange={setDraft}
-        onSend={() => void sendRevision()}
+        onSend={() => void sendRevision(character.id)}
       />
     </div>
   );

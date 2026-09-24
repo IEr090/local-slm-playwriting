@@ -1,4 +1,7 @@
 import { motion } from "motion/react";
+import { useState } from "react";
+import { Navigate } from "react-router";
+import { paths } from "@/features/characters/paths";
 import { Pill } from "@/shared/ui/Pill";
 import { fullName } from "@/features/characters/model/text";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
@@ -7,14 +10,25 @@ import { Axis, Fog, Orrery, Stars } from "./Scenery";
 import { STATUS } from "./timeline";
 import { useGeneration } from "./use-generation";
 
-/** Screen 1b — the generation animation (README §4.2). A fixed 1280×800 stage, centred. */
-export function GeneratingScreen() {
-  const { premise, generationReady, cast } = useCastState();
+/** Page "/generating" — the generation animation (README §4.2). */
+export function GeneratingPage() {
+  const { generation } = useCastState();
+  // Checked once on open: /generating without a running generation (e.g. after a reload) → prompt.
+  // Not re-checked later, so the page does not redirect while it fades out after finishing.
+  const [orphan] = useState(generation === "idle");
+  if (orphan) return <Navigate to={paths.prompt} replace />;
+  return <GenerationStage />;
+}
+
+/** A fixed 1280×800 stage, centred. */
+function GenerationStage() {
+  const { premise, generation, cast } = useCastState();
   const { cancelGeneration, finishGeneration } = useCastActions();
+  const ready = generation === "ready";
   const { phase, words, names, status } = useGeneration({
     premise,
-    ready: generationReady,
-    names: generationReady ? cast.map(fullName) : [],
+    ready,
+    names: ready ? cast.map(fullName) : [],
     onDone: finishGeneration,
   });
 

@@ -22,8 +22,37 @@ export interface GeneratedCast {
   cards: Record<string, CharacterCard>;
 }
 
-/** In-memory "database" of the current play. */
+/**
+ * The mock "server database" of the current play. Kept in localStorage, so a page reload (or opening
+ * /cast/<id> directly) finds the cast again. Unsaved edits live only in the app store until auto-save.
+ */
 const store = new Map<string, Character>();
+const cardStore = new Map<string, CharacterCard>();
+const STORAGE_KEY = "anton.mock-cast.v1";
+
+function persist() {
+  try {
+    globalThis.localStorage?.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ characters: [...store.values()], cards: Object.fromEntries(cardStore) }),
+    );
+  } catch {
+    // storage unavailable (private mode, tests) — keep working in memory
+  }
+}
+
+function restore() {
+  try {
+    const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw) as GeneratedCast & { characters: Character[] };
+    saved.characters.forEach((c) => store.set(c.id, c));
+    Object.entries(saved.cards).forEach(([id, card]) => cardStore.set(id, card));
+  } catch {
+    // unreadable storage — start empty
+  }
+}
+restore();
 
 const newId = () => crypto.randomUUID();
 const clone = <T>(value: T): T => structuredClone(value);
@@ -59,7 +88,10 @@ async function generateCast(premise: string, { signal }: CallOptions = {}): Prom
   const cards = Object.fromEntries(characters.map((c, i) => [c.id, clone(SEED_CAST[i].card)]));
 
   store.clear();
+  cardStore.clear();
   characters.forEach((c) => store.set(c.id, clone(c)));
+  Object.entries(cards).forEach(([id, card]) => cardStore.set(id, clone(card)));
+  persist();
   return { characters, cards };
 }
 
@@ -86,6 +118,8 @@ async function createBlankCharacter(): Promise<{ character: Character; card: Cha
     relationships: [],
   };
   store.set(character.id, clone(character));
+  cardStore.set(character.id, clone(BLANK_CARD));
+  persist();
   return { character, card: clone(BLANK_CARD) };
 }
 
@@ -97,7 +131,10 @@ async function generateCard(
 ): Promise<CharacterCard> {
   await delay(2600, signal);
   failIfConfigured("card");
-  return mockCard(character, previous);
+  const card = mockCard(character, previous);
+  cardStore.set(character.id, clone(card));
+  persist();
+  return card;
 }
 
 /** Chat "Ask AI to revise": the mock appends the request to Personality. */
@@ -123,13 +160,22 @@ async function reviseCharacter(
   };
 }
 
-/** Auto-save target: stores the character in memory. */
+/** Auto-save target: stores the character. */
 async function saveCharacter(character: Character): Promise<void> {
   await delay(150);
   store.set(character.id, clone(character));
+  persist();
+}
+
+/** The saved cast (e.g. after a page reload); empty if nothing was generated yet. */
+async function getCast(): Promise<GeneratedCast> {
+  const characters = [...store.values()].map(clone);
+  const cards = Object.fromEntries(characters.map((c) => [c.id, clone(cardStore.get(c.id) ?? BLANK_CARD)]));
+  return { characters, cards };
 }
 
 export const api = {
+  getCast,
   generateCast,
   createBlankCharacter,
   generateCard,
@@ -137,5 +183,5 @@ export const api = {
   saveCharacter,
 };
 
-/** Test-only view of the in-memory store. */
+/** Test-only view of the stored characters. */
 export const __store = store;

@@ -1,19 +1,21 @@
-// App state shape and reducer. Pure — no api calls here.
+// Character Creator state and reducer. Pure — no api calls, no navigation here.
+// Which page is shown is decided by the router (URL), not by this state.
 
 import { DEFAULT_PREMISE } from "@/features/characters/api/mock-data";
 import { cardSources, type CardSources } from "@/features/characters/model/card-sources";
 import type { Character, CharacterCard, ChatMessage, RevisionResult } from "@/features/characters/model/types";
-import type { ApiErrorInfo } from "@/shared/api/errors";
 
-export type Screen = "prompt" | "generating" | "grid" | "detail";
+/** idle → running (waiting for the api) → ready (api answered, animation plays the names) → idle. */
+export type GenerationStatus = "idle" | "running" | "ready";
 
 export interface CastState {
-  screen: Screen;
+  /** The saved cast has been read from the api (after a page load). */
+  loaded: boolean;
   premise: string;
+  generation: GenerationStatus;
   cast: Character[];
   cards: Record<string, CharacterCard>;
-  selectedIndex: number;
-  /** AI chat panel; closed whenever a character is opened from the grid (toggle in the header). */
+  /** AI chat panel; closed whenever a character is opened (toggle in the header). */
   chatOpen: boolean;
   chats: Record<string, ChatMessage[]>;
   draft: string;
@@ -27,18 +29,14 @@ export interface CastState {
   cardSnapshot: Record<string, CardSources>;
   /** Ids of characters edited since the last auto-save. */
   dirty: string[];
-  error: ApiErrorInfo | null;
-  toast: boolean;
-  /** The api has answered for the running generation; the animation then plays the result phase. */
-  generationReady: boolean;
 }
 
 export const initialState: CastState = {
-  screen: "prompt",
+  loaded: false,
   premise: DEFAULT_PREMISE,
+  generation: "idle",
   cast: [],
   cards: {},
-  selectedIndex: 0,
   chatOpen: false,
   chats: {},
   draft: "",
@@ -47,21 +45,16 @@ export const initialState: CastState = {
   updating: [],
   cardSnapshot: {},
   dirty: [],
-  error: null,
-  toast: false,
-  generationReady: false,
 };
 
 export type Action =
+  | { type: "castLoaded"; characters: Character[]; cards: Record<string, CharacterCard> }
   | { type: "setPremise"; premise: string }
-  | { type: "setScreen"; screen: Screen }
   | { type: "generationStarted" }
   | { type: "castGenerated"; characters: Character[]; cards: Record<string, CharacterCard> }
+  | { type: "generationEnded" }
   | { type: "characterAdded"; character: Character; card: CharacterCard }
-  | { type: "openCharacter"; index: number }
-  | { type: "showError"; error: ApiErrorInfo }
-  | { type: "dismissError" }
-  | { type: "setToast"; open: boolean }
+  | { type: "characterOpened" }
   | { type: "updateCharacter"; id: string; patch: Partial<Omit<Character, "id">> }
   | { type: "toggleChat" }
   | { type: "setDraft"; draft: string }
@@ -74,46 +67,43 @@ export type Action =
   | { type: "cardUpdateFailed"; id: string }
   | { type: "saved"; ids: string[] };
 
+/** A fresh cast (generated or loaded): new cards, snapshots, no chats. */
+function withCast(state: CastState, characters: Character[], cards: Record<string, CharacterCard>): CastState {
+  return {
+    ...state,
+    loaded: true,
+    cast: characters,
+    cards,
+    chats: {},
+    updating: [],
+    cardSnapshot: Object.fromEntries(characters.map((c) => [c.id, cardSources(c)])),
+    dirty: [],
+  };
+}
+
 export function reducer(state: CastState, action: Action): CastState {
   switch (action.type) {
+    case "castLoaded":
+      // a generation started before the saved cast arrived wins
+      return state.loaded ? state : withCast(state, action.characters, action.cards);
     case "setPremise":
       return { ...state, premise: action.premise };
-    case "setScreen":
-      return { ...state, screen: action.screen, toast: false };
     case "generationStarted":
-      return { ...state, screen: "generating", generationReady: false, error: null, toast: false };
+      return { ...state, generation: "running" };
     case "castGenerated":
-      return {
-        ...state,
-        generationReady: true,
-        cast: action.characters,
-        cards: action.cards,
-        chats: {},
-        updating: [],
-        cardSnapshot: Object.fromEntries(action.characters.map((c) => [c.id, cardSources(c)])),
-        dirty: [],
-        selectedIndex: 0,
-        error: null,
-      };
+      return { ...withCast(state, action.characters, action.cards), generation: "ready" };
+    case "generationEnded":
+      return { ...state, generation: "idle" };
     case "characterAdded":
       return {
         ...state,
+        loaded: true,
         cast: [...state.cast, action.character],
         cards: { ...state.cards, [action.character.id]: action.card },
         cardSnapshot: { ...state.cardSnapshot, [action.character.id]: cardSources(action.character) },
-        selectedIndex: state.cast.length,
-        draft: "",
-        chatOpen: false,
-        screen: "detail",
       };
-    case "openCharacter":
-      return { ...state, selectedIndex: action.index, draft: "", chatOpen: false, screen: "detail" };
-    case "showError":
-      return { ...state, error: action.error };
-    case "dismissError":
-      return { ...state, error: null };
-    case "setToast":
-      return { ...state, toast: action.open };
+    case "characterOpened":
+      return { ...state, draft: "", chatOpen: false };
     case "updateCharacter":
       return {
         ...state,

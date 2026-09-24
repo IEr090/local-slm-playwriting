@@ -3,8 +3,8 @@ import { ArrowRight } from "@/shared/ui/icons";
 import { GoldPill } from "@/shared/ui/Pill";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
 
-/** Screen 1 — "Describe your idea — we will summon the cast" (README §4.1). */
-export function PromptScreen() {
+/** Page "/" — "Describe your idea — we will summon the cast" (README §4.1). */
+export function PromptPage() {
   const { premise } = useCastState();
   const { setPremise, startGeneration, addBlank } = useCastActions();
 
