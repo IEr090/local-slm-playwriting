@@ -17,10 +17,13 @@ export function CharacterCardView({ character, card, number, updating = false, o
   return (
     <motion.button
       type="button"
+      // not clickable while the card is being updated
+      disabled={updating}
+      aria-busy={updating}
       onClick={onOpen}
-      whileHover={{ y: -2 }}
+      whileHover={updating ? undefined : { y: -2 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
-      className="relative box-border flex h-[244px] flex-col rounded-[10px] border border-line bg-card px-6 py-5 text-left text-ink transition-colors duration-150 hover:border-gold"
+      className={`relative box-border flex h-[244px] flex-col rounded-[10px] border border-line bg-card px-6 py-5 text-left text-ink transition-colors duration-150 ${updating ? "cursor-default" : "hover:border-gold"}`}
     >
       <span className="flex w-full items-center justify-between">
         <span className="font-sans text-[10px] tracking-[2.5px] text-gold">{roleLabel(card.role_label).toUpperCase()}</span>
