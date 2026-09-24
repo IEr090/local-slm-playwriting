@@ -31,13 +31,12 @@ export function CastProvider({ children }: { children: ReactNode }) {
     generation.current?.abort();
     const controller = new AbortController();
     generation.current = controller;
-    dispatch({ type: "dismissError" });
-    dispatch({ type: "setScreen", screen: "generating" });
+    dispatch({ type: "generationStarted" });
     try {
       const { characters, cards } = await api.generateCast(stateRef.current.premise, { signal: controller.signal });
       if (controller.signal.aborted) return;
+      // the generating screen plays the result phase and then opens the grid (finishGeneration)
       dispatch({ type: "castGenerated", characters, cards });
-      dispatch({ type: "setScreen", screen: "grid" });
     } catch (error) {
       if (isAbort(error) || controller.signal.aborted) return;
       dispatch({ type: "setScreen", screen: "prompt" });
@@ -84,6 +83,7 @@ export function CastProvider({ children }: { children: ReactNode }) {
     () => ({
       setPremise: (premise) => dispatch({ type: "setPremise", premise }),
       goTo: (screen) => dispatch({ type: "setScreen", screen }),
+      finishGeneration: () => dispatch({ type: "setScreen", screen: "grid" }),
       startGeneration,
       cancelGeneration,
       addBlank,

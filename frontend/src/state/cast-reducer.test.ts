@@ -92,4 +92,11 @@ describe("cast reducer", () => {
     const state = reducer({ ...initialState, cast: [character("a")] }, { type: "revisionRequested", id: "a", text: "x" });
     expect(reducer(state, { type: "revisionFailed", id: "a" }).aiTypingFor).toBeNull();
   });
+
+  it("marks the generation ready without leaving the generating screen", () => {
+    const started = reducer({ ...initialState, error: { message: "m", detail: "d" } }, { type: "generationStarted" });
+    expect(started).toMatchObject({ screen: "generating", generationReady: false, error: null });
+    const done = reducer(started, { type: "castGenerated", characters: [character("a")], cards: { a: BLANK_CARD } });
+    expect(done).toMatchObject({ screen: "generating", generationReady: true });
+  });
 });

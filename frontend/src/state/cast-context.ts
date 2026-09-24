@@ -9,6 +9,8 @@ export interface CastActions {
   goTo(screen: Screen): void;
   startGeneration(): Promise<void>;
   cancelGeneration(): void;
+  /** Called by the generation animation when the names have flowed out: opens the grid. */
+  finishGeneration(): void;
   addBlank(): Promise<void>;
   openCharacter(index: number): void;
   dismissError(): void;

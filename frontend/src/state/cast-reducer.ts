@@ -22,6 +22,8 @@ export interface CastState {
   updating: string[];
   error: ApiErrorInfo | null;
   toast: boolean;
+  /** The api has answered for the running generation; the animation then plays the result phase. */
+  generationReady: boolean;
 }
 
 export const initialState: CastState = {
@@ -38,11 +40,13 @@ export const initialState: CastState = {
   updating: [],
   error: null,
   toast: false,
+  generationReady: false,
 };
 
 export type Action =
   | { type: "setPremise"; premise: string }
   | { type: "setScreen"; screen: Screen }
+  | { type: "generationStarted" }
   | { type: "castGenerated"; characters: Character[]; cards: Record<string, CharacterCard> }
   | { type: "characterAdded"; character: Character; card: CharacterCard }
   | { type: "openCharacter"; index: number }
@@ -64,9 +68,12 @@ export function reducer(state: CastState, action: Action): CastState {
       return { ...state, premise: action.premise };
     case "setScreen":
       return { ...state, screen: action.screen, toast: false };
+    case "generationStarted":
+      return { ...state, screen: "generating", generationReady: false, error: null, toast: false };
     case "castGenerated":
       return {
         ...state,
+        generationReady: true,
         cast: action.characters,
         cards: action.cards,
         chats: {},
