@@ -5,7 +5,7 @@ import { CharacterCardView } from "./CharacterCardView";
 
 /** Screen 2 — the cast grid "Dramatis Personae" (README §4.3). */
 export function GridScreen() {
-  const { cast, cards, toast } = useCastState();
+  const { cast, cards, toast, updating } = useCastState();
   const { goTo, addBlank, openCharacter, showToast } = useCastActions();
 
   return (
@@ -34,6 +34,7 @@ export function GridScreen() {
             character={character}
             card={cards[character.id]}
             number={i + 1}
+            updating={updating.includes(character.id)}
             onOpen={() => openCharacter(i)}
           />
         ))}

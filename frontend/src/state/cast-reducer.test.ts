@@ -108,4 +108,45 @@ describe("cast reducer", () => {
     const done = reducer(started, { type: "castGenerated", characters: [character("a")], cards: { a: BLANK_CARD } });
     expect(done).toMatchObject({ screen: "generating", generationReady: true });
   });
+
+  describe("auto-save and card update", () => {
+    const elena = { ...character("elena"), personality: "Calm", goal: "Win" } as Character;
+    const generated = reducer(initialState, { type: "castGenerated", characters: [elena], cards: { elena: BLANK_CARD } });
+
+    it("snapshots the card sources on generation and marks edits dirty", () => {
+      expect(generated.cardSnapshot.elena).toMatchObject({ personality: "Calm", goal: "Win" });
+      const edited = reducer(generated, { type: "updateCharacter", id: "elena", patch: { goal: "Lose" } });
+      expect(edited.dirty).toEqual(["elena"]);
+      expect(reducer(edited, { type: "saved", ids: ["elena"] }).dirty).toEqual([]);
+    });
+
+    it("replaces the card and the snapshot when the update arrives", () => {
+      const updating = reducer(generated, { type: "cardsUpdating", ids: ["elena"] });
+      expect(updating.updating).toEqual(["elena"]);
+      const card = { ...BLANK_CARD, tagline: "New" };
+      const done = reducer(updating, {
+        type: "cardUpdated",
+        id: "elena",
+        card,
+        sources: { ...generated.cardSnapshot.elena, goal: "Lose" },
+      });
+      expect(done.updating).toEqual([]);
+      expect(done.cards.elena).toBe(card);
+      expect(done.cardSnapshot.elena.goal).toBe("Lose");
+    });
+
+    it("keeps the old card when the update fails", () => {
+      const updating = reducer(generated, { type: "cardsUpdating", ids: ["elena"] });
+      const failed = reducer(updating, { type: "cardUpdateFailed", id: "elena" });
+      expect(failed.updating).toEqual([]);
+      expect(failed.cards.elena).toBe(BLANK_CARD);
+    });
+
+    it("ignores a late card for a character that no longer exists", () => {
+      const updating = reducer(generated, { type: "cardsUpdating", ids: ["gone"] });
+      const late = reducer(updating, { type: "cardUpdated", id: "gone", card: BLANK_CARD, sources: generated.cardSnapshot.elena });
+      expect(late.cards.gone).toBeUndefined();
+      expect(late.updating).toEqual([]);
+    });
+  });
 });

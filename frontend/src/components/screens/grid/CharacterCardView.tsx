@@ -1,16 +1,19 @@
 import { motion } from "motion/react";
 import { fullName } from "@/lib/text";
+import { CardUpdatingOverlay } from "./CardUpdatingOverlay";
 import { roleLabel, type Character, type CharacterCard } from "@/types/character";
 
 interface CharacterCardViewProps {
   character: Character;
   card: CharacterCard;
   number: number;
+  /** The card is being regenerated after an edit. */
+  updating?: boolean;
   onOpen(): void;
 }
 
 /** One card of the cast grid. The name comes live from the profile; everything else from the card. */
-export function CharacterCardView({ character, card, number, onOpen }: CharacterCardViewProps) {
+export function CharacterCardView({ character, card, number, updating = false, onOpen }: CharacterCardViewProps) {
   return (
     <motion.button
       type="button"
@@ -44,6 +47,8 @@ export function CharacterCardView({ character, card, number, onOpen }: Character
         <CardLine label="WANTS" text={card.wants} />
         <CardLine label="FEARS" text={card.fears} />
       </span>
+
+      <CardUpdatingOverlay show={updating} />
     </motion.button>
   );
 }

@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import { api, ApiError } from "@/api";
+import { cardSources, cardSourcesChanged } from "@/lib/card-sources";
 import type { ApiErrorInfo } from "@/types/character";
 import { ActionsContext, StateContext, type CastActions } from "./cast-context";
 import { initialState, reducer } from "./cast-reducer";
+
+/** Several changed characters update one after another (prototype: 2600 + i·700 ms). */
+const CARD_UPDATE_STAGGER_MS = 700;
 
 function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiError) return { message: error.message, detail: error.detail };
@@ -79,6 +83,37 @@ export function CastProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Auto-save on leaving the character (README §4.5): save everything edited, then regenerate only
+   * the cards whose source fields changed — one after another (700 ms apart), each showing the
+   * updating overlay. A failed update keeps the old card and shows the error banner.
+   */
+  const leaveToGrid = useCallback(() => {
+    const { cast, cards, cardSnapshot, updating, dirty } = stateRef.current;
+    dispatch({ type: "setScreen", screen: "grid" });
+
+    const edited = cast.filter((c) => dirty.includes(c.id));
+    if (edited.length) {
+      dispatch({ type: "saved", ids: edited.map((c) => c.id) });
+      edited.forEach((c) => void api.saveCharacter(c));
+    }
+
+    const changed = cast.filter((c) => !updating.includes(c.id) && cardSourcesChanged(c, cardSnapshot[c.id]));
+    if (!changed.length) return;
+    dispatch({ type: "cardsUpdating", ids: changed.map((c) => c.id) });
+    changed.forEach((character, i) => {
+      setTimeout(async () => {
+        try {
+          const card = await api.generateCard(character, cards[character.id]);
+          dispatch({ type: "cardUpdated", id: character.id, card, sources: cardSources(character) });
+        } catch (error) {
+          dispatch({ type: "cardUpdateFailed", id: character.id });
+          dispatch({ type: "showError", error: toErrorInfo(error) });
+        }
+      }, i * CARD_UPDATE_STAGGER_MS);
+    });
+  }, []);
+
   const actions = useMemo<CastActions>(
     () => ({
       setPremise: (premise) => dispatch({ type: "setPremise", premise }),
@@ -92,12 +127,12 @@ export function CastProvider({ children }: { children: ReactNode }) {
       showToast,
       updateCharacter: (id, patch) => dispatch({ type: "updateCharacter", id, patch }),
       stepCharacter: (delta) => dispatch({ type: "stepCharacter", delta }),
-      leaveToGrid: () => dispatch({ type: "setScreen", screen: "grid" }),
+      leaveToGrid,
       toggleChat: () => dispatch({ type: "toggleChat" }),
       setDraft: (draft) => dispatch({ type: "setDraft", draft }),
       sendRevision,
     }),
-    [startGeneration, cancelGeneration, addBlank, showToast, sendRevision],
+    [startGeneration, cancelGeneration, addBlank, showToast, sendRevision, leaveToGrid],
   );
 
   return (

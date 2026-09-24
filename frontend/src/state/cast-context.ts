@@ -20,7 +20,7 @@ export interface CastActions {
   updateCharacter(id: string, patch: Partial<Omit<Character, "id">>): void;
   /** Previous / next character, wrapping around. */
   stepCharacter(delta: 1 | -1): void;
-  /** "ALL CHARACTERS": back to the grid (auto-save hooks in here in block 8). */
+  /** "ALL CHARACTERS": back to the grid; auto-saves and regenerates changed cards. */
   leaveToGrid(): void;
   toggleChat(): void;
   setDraft(draft: string): void;
