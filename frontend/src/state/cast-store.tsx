@@ -126,7 +126,6 @@ export function CastProvider({ children }: { children: ReactNode }) {
       dismissError: () => dispatch({ type: "dismissError" }),
       showToast,
       updateCharacter: (id, patch) => dispatch({ type: "updateCharacter", id, patch }),
-      stepCharacter: (delta) => dispatch({ type: "stepCharacter", delta }),
       leaveToGrid,
       toggleChat: () => dispatch({ type: "toggleChat" }),
       setDraft: (draft) => dispatch({ type: "setDraft", draft }),

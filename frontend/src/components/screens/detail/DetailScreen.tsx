@@ -7,7 +7,7 @@ import { FieldGrid } from "./FieldGrid";
 /** Screen 3 — character detail: live header + scrollable field cards (README §4.4). */
 export function DetailScreen() {
   const { cast, cards, selectedIndex, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();
-  const { updateCharacter, stepCharacter, leaveToGrid, toggleChat, setDraft, sendRevision } = useCastActions();
+  const { updateCharacter, leaveToGrid, toggleChat, setDraft, sendRevision } = useCastActions();
   const character = cast[Math.min(selectedIndex, cast.length - 1)];
   if (!character) return null;
 
@@ -21,8 +21,6 @@ export function DetailScreen() {
           index={selectedIndex}
           total={cast.length}
           chatOpen={chatOpen}
-          onPrev={() => stepCharacter(-1)}
-          onNext={() => stepCharacter(1)}
           onAll={leaveToGrid}
           onToggleChat={toggleChat}
         />

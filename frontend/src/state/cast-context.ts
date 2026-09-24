@@ -18,8 +18,6 @@ export interface CastActions {
   showToast(): void;
   /** Inline edit of one character (every field is always editable). */
   updateCharacter(id: string, patch: Partial<Omit<Character, "id">>): void;
-  /** Previous / next character, wrapping around. */
-  stepCharacter(delta: 1 | -1): void;
   /** "ALL CHARACTERS": back to the grid; auto-saves and regenerates changed cards. */
   leaveToGrid(): void;
   toggleChat(): void;

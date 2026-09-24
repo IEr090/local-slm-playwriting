@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, Spark } from "@/components/common/icons";
+import { ArrowLeft, Spark } from "@/components/common/icons";
 import { RoundIconButton } from "@/components/common/RoundIconButton";
 import { fullName, headLine } from "@/lib/text";
 import { roleLabel, type Character } from "@/types/character";
@@ -8,14 +8,12 @@ interface DetailHeaderProps {
   index: number;
   total: number;
   chatOpen: boolean;
-  onPrev(): void;
-  onNext(): void;
   onAll(): void;
   onToggleChat(): void;
 }
 
 /** Fixed header; name and line update live while typing (README §4.4). */
-export function DetailHeader({ character, index, total, chatOpen, onPrev, onNext, onAll, onToggleChat }: DetailHeaderProps) {
+export function DetailHeader({ character, index, total, chatOpen, onAll, onToggleChat }: DetailHeaderProps) {
   const chatLabel = chatOpen ? "Hide AI chat" : "Show AI chat";
   return (
     <div className="relative flex items-end justify-between border-b border-dotted border-line-strong px-12 pt-[34px] pb-[18px]">
@@ -35,12 +33,6 @@ export function DetailHeader({ character, index, total, chatOpen, onPrev, onNext
       </div>
 
       <div className="mb-1 flex shrink-0 items-center gap-[10px]">
-        <RoundIconButton onClick={onPrev} aria-label="Previous character">
-          <ChevronLeft />
-        </RoundIconButton>
-        <RoundIconButton onClick={onNext} aria-label="Next character">
-          <ChevronRight />
-        </RoundIconButton>
         <button
           type="button"
           onClick={onAll}

@@ -20,12 +20,6 @@ export const ArrowRight = ({ size = 14, className }: IconProps) => (
 export const ArrowLeft = ({ size = 14, className }: IconProps) => (
   <svg {...base(size)} strokeWidth={1.5} className={className}><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
 );
-export const ChevronLeft = ({ size = 14, className }: IconProps) => (
-  <svg {...base(size)} strokeWidth={1.5} className={className}><path d="M15 6l-6 6 6 6" /></svg>
-);
-export const ChevronRight = ({ size = 14, className }: IconProps) => (
-  <svg {...base(size)} strokeWidth={1.5} className={className}><path d="M9 6l6 6-6 6" /></svg>
-);
 export const ChevronDown = ({ size = 10, className }: IconProps) => (
   <svg {...base(size)} strokeWidth={2} className={className}><path d="M6 9l6 6 6-6" /></svg>
 );

@@ -62,7 +62,6 @@ export type Action =
   | { type: "dismissError" }
   | { type: "setToast"; open: boolean }
   | { type: "updateCharacter"; id: string; patch: Partial<Omit<Character, "id">> }
-  | { type: "stepCharacter"; delta: 1 | -1 }
   | { type: "toggleChat" }
   | { type: "setDraft"; draft: string }
   | { type: "revisionRequested"; id: string; text: string }
@@ -120,11 +119,6 @@ export function reducer(state: CastState, action: Action): CastState {
         cast: state.cast.map((c) => (c.id === action.id ? { ...c, ...action.patch } : c)),
         dirty: markDirty(state.dirty, action.id),
       };
-    case "stepCharacter": {
-      const n = state.cast.length;
-      if (!n) return state;
-      return { ...state, selectedIndex: (state.selectedIndex + action.delta + n) % n, draft: "" };
-    }
     case "toggleChat":
       return { ...state, chatOpen: !state.chatOpen };
     case "setDraft":

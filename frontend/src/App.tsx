@@ -3,7 +3,8 @@ import { DetailScreen } from "@/components/screens/detail/DetailScreen";
 import { GeneratingScreen } from "@/components/screens/generating/GeneratingScreen";
 import { GridScreen } from "@/components/screens/grid/GridScreen";
 import { PromptScreen } from "@/components/screens/prompt/PromptScreen";
-import { useCastState } from "@/state/cast-context";
+import { ErrorBanner } from "@/components/common/ErrorBanner";
+import { useCastActions, useCastState } from "@/state/cast-context";
 import type { Screen } from "@/state/cast-reducer";
 
 const SCREENS: Record<Screen, () => React.JSX.Element | null> = {
@@ -14,7 +15,8 @@ const SCREENS: Record<Screen, () => React.JSX.Element | null> = {
 };
 
 export default function App() {
-  const { screen } = useCastState();
+  const { screen, error } = useCastState();
+  const { dismissError } = useCastActions();
   const Current = SCREENS[screen];
 
   return (
@@ -31,6 +33,8 @@ export default function App() {
           <Current />
         </motion.div>
       </AnimatePresence>
+
+      <ErrorBanner error={error} onDismiss={dismissError} />
     </div>
   );
 }

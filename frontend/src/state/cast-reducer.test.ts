@@ -49,24 +49,14 @@ describe("cast reducer", () => {
     expect(after.cast[0]).toBe(state.cast[0]);
   });
 
-  it("steps through characters with wrap-around and clears the chat draft", () => {
-    const state = { ...initialState, cast: [character("a"), character("b"), character("c")], draft: "x" };
-    expect(reducer(state, { type: "stepCharacter", delta: -1 }).selectedIndex).toBe(2);
-    const next = reducer({ ...state, selectedIndex: 2 }, { type: "stepCharacter", delta: 1 });
-    expect(next.selectedIndex).toBe(0);
-    expect(next.draft).toBe("");
-  });
-
   it("toggles the chat panel", () => {
     expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(true);
   });
 
-  it("opens a character from the grid with the chat closed, and keeps it while stepping", () => {
+  it("opens a character from the grid (or a new one) with the chat closed", () => {
     const state = { ...initialState, cast: [character("a"), character("b")], chatOpen: true };
     const opened = reducer(state, { type: "openCharacter", index: 1 });
     expect(opened.chatOpen).toBe(false);
-    const toggled = reducer(opened, { type: "toggleChat" });
-    expect(reducer(toggled, { type: "stepCharacter", delta: 1 }).chatOpen).toBe(true);
     expect(reducer(state, { type: "characterAdded", character: character("c"), card: BLANK_CARD }).chatOpen).toBe(false);
   });
 
