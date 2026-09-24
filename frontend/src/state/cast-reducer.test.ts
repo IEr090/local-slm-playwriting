@@ -35,4 +35,10 @@ describe("cast reducer", () => {
     expect(shown.error).toEqual(error);
     expect(reducer(shown, { type: "dismissError" }).error).toBeNull();
   });
+
+  it("hides the toast when the screen changes", () => {
+    const shown = reducer(initialState, { type: "setToast", open: true });
+    expect(shown.toast).toBe(true);
+    expect(reducer(shown, { type: "setScreen", screen: "prompt" }).toast).toBe(false);
+  });
 });

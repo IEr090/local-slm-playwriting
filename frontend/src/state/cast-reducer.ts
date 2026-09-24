@@ -43,14 +43,15 @@ export type Action =
   | { type: "characterAdded"; character: Character; card: CharacterCard }
   | { type: "openCharacter"; index: number }
   | { type: "showError"; error: ApiErrorInfo }
-  | { type: "dismissError" };
+  | { type: "dismissError" }
+  | { type: "setToast"; open: boolean };
 
 export function reducer(state: CastState, action: Action): CastState {
   switch (action.type) {
     case "setPremise":
       return { ...state, premise: action.premise };
     case "setScreen":
-      return { ...state, screen: action.screen };
+      return { ...state, screen: action.screen, toast: false };
     case "castGenerated":
       return {
         ...state,
@@ -76,5 +77,7 @@ export function reducer(state: CastState, action: Action): CastState {
       return { ...state, error: action.error };
     case "dismissError":
       return { ...state, error: null };
+    case "setToast":
+      return { ...state, toast: action.open };
   }
 }

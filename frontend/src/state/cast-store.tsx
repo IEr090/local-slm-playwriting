@@ -1,6 +1,6 @@
 // App state provider: one reducer + context. Data only ever comes from `api`; this store just holds it.
 
-import { useCallback, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import { api, ApiError } from "@/api";
 import type { ApiErrorInfo } from "@/types/character";
 import { ActionsContext, StateContext, type CastActions } from "./cast-context";
@@ -47,6 +47,14 @@ export function CastProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showToast = useCallback(() => {
+    clearTimeout(toastTimer.current);
+    dispatch({ type: "setToast", open: true });
+    toastTimer.current = setTimeout(() => dispatch({ type: "setToast", open: false }), 3000);
+  }, []);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+
   const addBlank = useCallback(async () => {
     const { character, card } = await api.createBlankCharacter();
     dispatch({ type: "characterAdded", character, card });
@@ -61,8 +69,9 @@ export function CastProvider({ children }: { children: ReactNode }) {
       addBlank,
       openCharacter: (index) => dispatch({ type: "openCharacter", index }),
       dismissError: () => dispatch({ type: "dismissError" }),
+      showToast,
     }),
-    [startGeneration, cancelGeneration, addBlank],
+    [startGeneration, cancelGeneration, addBlank, showToast],
   );
 
   return (

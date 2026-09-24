@@ -11,6 +11,8 @@ export interface CastActions {
   addBlank(): Promise<void>;
   openCharacter(index: number): void;
   dismissError(): void;
+  /** Shows the "Continue" toast for 3 s. */
+  showToast(): void;
 }
 
 export const StateContext = createContext<CastState | null>(null);
