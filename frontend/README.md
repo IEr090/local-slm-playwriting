@@ -42,12 +42,20 @@ Several can be combined: `?genDelay=300&fail=card,chat`.
 
 ```
 src/
-  api/          mock api — the only data source
-  types/        Character, CharacterCard and related types
-  state/        app store (reducer + context)
-  components/   screens (prompt, generating, grid, detail) and shared UI
-  lib/          helpers (text, relationships, card sources)
-  hooks/        useAutoGrow
+  app/                    App: screens + error banner
+  shared/                 used by every feature
+    api/errors.ts         ApiError, ApiErrorInfo
+    ui/                   Pill, Chip, Orb, Toast, ErrorBanner, icons
+    ui/shadcn/            generated shadcn/ui components
+    lib/  hooks/          cn(), useAutoGrow
+  features/
+    characters/           Character Creator
+      api/                mock api — the only data source
+      model/              types, labels, pure helpers (+ tests)
+      store/              reducer, context, CastProvider
+      pages/              prompt, generating, grid, detail
 ```
+
+A new feature (e.g. plot) gets its own `features/<name>/` with the same folders.
 
 Fonts are bundled via `@fontsource`, so the app works offline.
