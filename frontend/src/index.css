@@ -1,0 +1,149 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------- Anton design tokens ---------- */
+@theme static {
+    --font-sans: 'Jost', sans-serif;
+    --font-serif: 'Cormorant Garamond', serif;
+
+    /* surfaces */
+    --color-bg: #0b0a08;
+    --color-panel: #100d08;
+    --color-card: #141109;
+    --color-card-focus: #17130b;
+    --color-bubble: #1a160d;
+    --color-well: #0f0c07;
+
+    /* borders */
+    --color-line: #3c3627;
+    --color-line-strong: #4a4229;
+    --color-line-hover: #6b5f45;
+    --color-line-subtle: #2e2a1f;
+
+    /* accent */
+    --color-gold: #c9a24b;
+    --color-gold-soft: #d6b56a;
+    --color-gold-light: #e3c47a;
+
+    /* error banner only */
+    --color-terracotta: #c46a4a;
+
+    /* text */
+    --color-ink: #ece6d8;
+    --color-ink-2: #c9c2b0;
+    --color-ink-3: #d6cfbd;
+    --color-muted: #9a8f78;
+    --color-muted-2: #8a8272;
+    --color-faint: #6f6a5c;
+    --color-placeholder: #524c40;
+
+    /* background loops */
+    --animate-spin-slow: spin 24s linear infinite;
+    --animate-ring-a: spin 28s linear infinite;
+    --animate-ring-b: spin-rev 18s linear infinite;
+    --animate-ring-c: spin 9s linear infinite;
+    --animate-ring-fast: spin 3s linear infinite;
+    --animate-breathe: breathe 3.2s ease-in-out infinite;
+    --animate-glow: glow 3.2s ease-in-out infinite;
+    --animate-drift: drift 14s ease-in-out infinite alternate;
+    --animate-travel: travel 4s ease-in-out infinite;
+    --animate-twinkle: twinkle 3s ease-in-out infinite;
+    --animate-dots: dots 1.2s ease-in-out infinite;
+    --animate-shimmer: shimmer 2.2s linear infinite;
+    --animate-fade-up: fade-up 0.6s ease-out both;
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes spin-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+    @keyframes breathe { 0%, 100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.04); } }
+    @keyframes glow { 0%, 100% { opacity: .25; } 50% { opacity: .6; } }
+    @keyframes drift { 0% { transform: translateX(-4%); opacity: .35; } 50% { opacity: .6; } 100% { transform: translateX(4%); opacity: .35; } }
+    @keyframes travel { 0% { left: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+    @keyframes twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+    @keyframes dots { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes fade-up { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: translateY(0); } }
+}
+
+/* ---------- shadcn/ui variables mapped onto the Anton palette (dark only) ---------- */
+@theme inline {
+    --font-heading: var(--font-serif);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+}
+
+:root {
+    --radius: 0.625rem;
+    --background: #0b0a08;
+    --foreground: #ece6d8;
+    --card-foreground: #ece6d8;
+    --popover: #17130b;
+    --popover-foreground: #ece6d8;
+    --primary: #c9a24b;
+    --primary-foreground: #0b0a08;
+    --secondary: #141109;
+    --secondary-foreground: #c9c2b0;
+    --muted-foreground: #8a8272;
+    --accent: #c9a24b1a;
+    --accent-foreground: #ece6d8;
+    --destructive: #c46a4a;
+    --border: #3c3627;
+    --input: #4a4229;
+    --ring: #c9a24b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-bg text-ink antialiased;
+    margin: 0;
+  }
+  button {
+    cursor: pointer;
+  }
+}
+
+/* ---------- helpers that Tailwind utilities can't express neatly ---------- */
+@layer components {
+  .dotted-rule { border-top: 1px dotted var(--color-line-strong); }
+
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+  .scroll-thin::-webkit-scrollbar { width: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 3px; }
+
+  .shimmer-text {
+    background: linear-gradient(90deg, #6f6a5c 0%, #e3c47a 50%, #6f6a5c 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: var(--animate-shimmer);
+  }
+
+  .orb-core { background: radial-gradient(circle, #1f1910 0%, #0b0a08 80%); }
+}
