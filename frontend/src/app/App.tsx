@@ -16,7 +16,7 @@ export default function App() {
   return (
     <div className="relative h-screen min-h-[800px] w-screen min-w-[1280px] overflow-hidden bg-bg text-ink">
       <AnimatePresence initial={false}>
-        {/* page transition: opacity + small y, as .screen in the prototype */}
+        {/* page transition: opacity + small y */}
         <motion.div
           key={location.pathname}
           className="absolute inset-0"

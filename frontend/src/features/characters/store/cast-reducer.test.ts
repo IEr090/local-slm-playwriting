@@ -6,7 +6,7 @@ import { initialState, reducer } from "./cast-reducer";
 const character = (id: string) => ({ id, name: id, surname: "", relationships: [] }) as unknown as Character;
 
 describe("cast reducer", () => {
-  it("starts with the prototype premise, an empty cast, nothing loaded and no generation", () => {
+  it("starts with the default premise, an empty cast, nothing loaded and no generation", () => {
     expect(initialState.loaded).toBe(false);
     expect(initialState.generation).toBe("idle");
     expect(initialState.premise).toMatch(/^An independent theatre in Vienna/);

@@ -8,7 +8,7 @@ export function fullName(character: Pick<Character, "name" | "surname">): string
   return `${character.name || ""} ${character.surname || ""}`.trim();
 }
 
-/** Text before the first "." "," or ";" — used for the short header line. */
+/** Text before the first "." "," or ";", used for the short header line. */
 export function firstClause(text: string): string {
   return (text || "").split(/[.,;]/)[0].trim();
 }

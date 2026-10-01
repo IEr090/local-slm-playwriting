@@ -1,4 +1,4 @@
-// Thin-stroke icons copied from the prototype's inline SVGs.
+// Thin-stroke icons.
 
 interface IconProps {
   size?: number;

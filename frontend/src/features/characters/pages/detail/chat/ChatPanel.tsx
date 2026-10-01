@@ -14,7 +14,7 @@ interface ChatPanelProps {
   onSend(): void;
 }
 
-/** "ASK AI TO REVISE" panel on the right; width animates 400 ↔ 0 (README §4.4). */
+/** "ASK AI TO REVISE" panel on the right; width animates 400 ↔ 0. */
 export function ChatPanel({ open, characterName, messages, typing, draft, onDraftChange, onSend }: ChatPanelProps) {
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -49,7 +49,7 @@ export function ChatPanel({ open, characterName, messages, typing, draft, onDraf
         <div ref={scroller} className="scroll-thin flex flex-1 flex-col gap-[14px] overflow-y-auto">
           {messages.length === 0 && !typing && (
             <div className="font-sans text-[13px] leading-[1.6] text-faint">
-              Describe what should change about {characterName} — for example “make her more cynical” or “give him a
+              Describe what should change about {characterName}, for example “make her more cynical” or “give him a
               secret”. The Character Agent will rewrite the relevant fields.
             </div>
           )}

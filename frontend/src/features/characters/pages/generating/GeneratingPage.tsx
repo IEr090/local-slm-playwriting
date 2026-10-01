@@ -10,11 +10,10 @@ import { Axis, Fog, Orrery, Stars } from "./Scenery";
 import { STATUS } from "./timeline";
 import { useGeneration } from "./use-generation";
 
-/** Page "/generating" — the generation animation (README §4.2). */
+/** Page "/generating": the generation animation. */
 export function GeneratingPage() {
   const { generation } = useCastState();
-  // Checked once on open: /generating without a running generation (e.g. after a reload) → prompt.
-  // Not re-checked later, so the page does not redirect while it fades out after finishing.
+  // /generating without a running generation (e.g. after a reload) → prompt
   const [orphan] = useState(generation === "idle");
   if (orphan) return <Navigate to={paths.prompt} replace />;
   return <GenerationStage />;
@@ -42,7 +41,7 @@ function GenerationStage() {
 
         <div className="absolute top-[590px] left-0 flex w-[1280px] flex-col items-center gap-[14px]">
           <div className="font-serif text-[15px] tracking-[6px] text-gold">SUMMONING THE CAST</div>
-          {/* the new status replaces the old one and fades up (as .fade-up in the prototype) */}
+          {/* the new status replaces the old one and fades up */}
           <motion.div
             key={status}
             aria-live="polite"

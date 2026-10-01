@@ -1,4 +1,4 @@
-// Character Creator state and reducer. Pure — no api calls, no navigation here.
+// Character Creator state and reducer. Pure: no api calls, no navigation here.
 // Which page is shown is decided by the router (URL), not by this state.
 
 import { DEFAULT_PREMISE } from "@/features/characters/api/mock-data";
@@ -25,7 +25,7 @@ export interface CastState {
   highlight: { id: string; fields: (keyof Character)[] } | null;
   /** Ids of characters whose card is being regenerated. */
   updating: string[];
-  /** Card source fields as they were when each card was last generated (README §4.5). */
+  /** Card source fields as they were when each card was last generated. */
   cardSnapshot: Record<string, CardSources>;
   /** Ids of characters edited since the last auto-save. */
   dirty: string[];
@@ -84,7 +84,6 @@ function withCast(state: CastState, characters: Character[], cards: Record<strin
 export function reducer(state: CastState, action: Action): CastState {
   switch (action.type) {
     case "castLoaded":
-      // a generation started before the saved cast arrived wins
       return state.loaded ? state : withCast(state, action.characters, action.cards);
     case "setPremise":
       return { ...state, premise: action.premise };
@@ -123,7 +122,6 @@ export function reducer(state: CastState, action: Action): CastState {
       };
     case "revisionAnswered": {
       const { result } = action;
-      // apply only the fields the AI changed, so edits made while it was typing survive
       const patch = Object.fromEntries(result.changed_fields.map((f) => [f, result.character[f]]));
       return {
         ...state,
@@ -147,7 +145,6 @@ export function reducer(state: CastState, action: Action): CastState {
     case "cardsUpdating":
       return { ...state, updating: [...new Set([...state.updating, ...action.ids])] };
     case "cardUpdated":
-      // ignore late answers for a cast that has since been replaced
       if (!state.cast.some((c) => c.id === action.id)) return { ...state, updating: without(state.updating, action.id) };
       return {
         ...state,
@@ -156,7 +153,6 @@ export function reducer(state: CastState, action: Action): CastState {
         updating: without(state.updating, action.id),
       };
     case "cardUpdateFailed":
-      // keep the old card
       return { ...state, updating: without(state.updating, action.id) };
     case "saved":
       return { ...state, dirty: state.dirty.filter((id) => !action.ids.includes(id)) };

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 
 /**
- * Textarea grows downwards with its content — no inner scrolling (README §4.4).
+ * Textarea grows downwards with its content, no inner scrolling.
  * `rows` on the textarea stays the minimum height. Re-measures on value change and on width change
  * (e.g. when the chat panel opens or closes).
  */

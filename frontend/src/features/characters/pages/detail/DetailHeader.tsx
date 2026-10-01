@@ -13,7 +13,7 @@ interface DetailHeaderProps {
   onToggleChat(): void;
 }
 
-/** Fixed header; name and line update live while typing (README §4.4). */
+/** Fixed header; name and line update live while typing. */
 export function DetailHeader({ character, index, total, chatOpen, onAll, onToggleChat }: DetailHeaderProps) {
   const chatLabel = chatOpen ? "Hide AI chat" : "Show AI chat";
   return (

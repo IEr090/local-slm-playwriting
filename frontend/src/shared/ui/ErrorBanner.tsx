@@ -8,7 +8,7 @@ interface ErrorBannerProps {
 }
 
 /**
- * One reusable error banner for generation, card update and chat (README §4.6, Error.dc.html):
+ * One reusable error banner for generation, card update and chat:
  * top centre, 640px, terracotta left border, message + faint technical detail, close ×.
  */
 export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {

@@ -1,8 +1,8 @@
-# Anton — Character Creator (frontend)
+# Anton: Character Creator (frontend)
 
 Web frontend for the Character Creator: premise → generated cast → character editing.
 Vite + React + TypeScript + Tailwind + shadcn/ui + Motion. All data comes from a mock `api`
-(`src/api`), no backend is needed yet.
+(`src/features/characters/api`), no backend is needed yet.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ src/
     lib/  hooks/          cn(), useAutoGrow
   features/
     characters/           Character Creator
-      api/                mock api — the only data source
+      api/                mock api, the only data source
       model/              types, labels, pure helpers (+ tests)
       store/              reducer, context, CastProvider
       pages/              prompt, generating, grid, detail

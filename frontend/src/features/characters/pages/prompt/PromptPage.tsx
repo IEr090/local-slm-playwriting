@@ -3,7 +3,7 @@ import { ArrowRight } from "@/shared/ui/icons";
 import { GoldPill } from "@/shared/ui/Pill";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
 
-/** Page "/" — "Describe your idea — we will summon the cast" (README §4.1). */
+/** Page "/": premise prompt. */
 export function PromptPage() {
   const { premise } = useCastState();
   const { setPremise, startGeneration, addBlank } = useCastActions();
@@ -36,7 +36,7 @@ export function PromptPage() {
         <div className="flex flex-col items-center gap-[10px]">
           <div className="font-serif text-[15px] tracking-[6px] text-gold">A NEW STORY BEGINS</div>
           <h1 className="m-0 text-center font-serif text-[52px] leading-[1.15] font-medium">
-            Describe your idea — we will summon the cast
+            Describe your idea and we will summon the cast
           </h1>
           <p className="m-0 max-w-[520px] text-center font-sans text-sm leading-[1.6] text-muted-2">
             Tell us about your play: its premise, place and mood. Anton will propose a cast of characters, ready for you

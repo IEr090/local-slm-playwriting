@@ -28,7 +28,7 @@ interface Options {
 
 /**
  * Drives the generating screen: phase 1 premise words, phase 2 waiting statuses,
- * phase 3 burst + names (README §4.2). All timers are cleared on unmount (e.g. CANCEL).
+ * phase 3 burst + names. All timers are cleared on unmount (e.g. CANCEL).
  */
 export function useGeneration({ premise, ready, names, onDone }: Options) {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -80,10 +80,12 @@ export function useGeneration({ premise, ready, names, onDone }: Options) {
 
   // Phase 3: once the api has answered (and the words are done), burst → names → grid.
   const namesKey = names.join("|");
+  const started = phase !== "loading";
   useEffect(() => {
-    if (!ready || phase === "loading") return;
+    if (!ready || !started) return;
     readyAt.current ??= performance.now() - startedAt.current;
-    const planned = planNames(names, names.map((n) => measureText(n, NAME_FONT)));
+    const list = namesKey ? namesKey.split("|") : [];
+    const planned = planNames(list, list.map((n) => measureText(n, NAME_FONT)));
     const { burstAt, namesAt, gridAt } = resultSchedule(absorbedMs.current, readyAt.current, planned);
     const now = performance.now() - startedAt.current;
     const timers = [
@@ -96,9 +98,7 @@ export function useGeneration({ premise, ready, names, onDone }: Options) {
       setTimeout(() => onDoneRef.current(), Math.max(0, gridAt - now)),
     ];
     return () => timers.forEach(clearTimeout);
-    // `phase` only matters for leaving "loading"; the schedule is fixed once computed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, phase === "loading", namesKey]);
+  }, [ready, started, namesKey]);
 
   return { phase, words, names: flyingNames, status };
 }

@@ -21,7 +21,7 @@ type TextKey = {
   [K in keyof Character]: Character[K] extends string ? K : never;
 }[keyof Character];
 
-/** The 16 always-editable field cards in two sections (README §4.4). */
+/** The 16 always-editable field cards in two sections. */
 export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [] }: FieldGridProps) {
   const text = (key: TextKey, num: number, label: string, rows: number, span: 2 | 4, hint?: string) => (
     <FieldCard

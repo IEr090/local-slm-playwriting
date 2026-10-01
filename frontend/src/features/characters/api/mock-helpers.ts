@@ -4,7 +4,7 @@
 import { ApiError } from "@/shared/api/errors";
 import type { Character, CharacterCard } from "@/features/characters/model/types";
 
-// ---------- text shortening (ported from mockCard() in the prototype) ----------
+// ---------- text shortening ----------
 
 /** First clause of `text`, at most `n` words, "…" if cut, first letter capitalised. */
 export function clause(text: string, n: number): string {

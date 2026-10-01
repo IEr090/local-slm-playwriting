@@ -1,4 +1,4 @@
-// The six characters from initialCast() in Prototype.dc.html, converted to the §5 types.
+// The six seed characters of the mock cast.
 // Relationships are written by first name here; the api turns them into ids.
 
 import type { Character, CharacterCard } from "@/features/characters/model/types";
@@ -23,20 +23,20 @@ export const SEED_CAST: SeedCharacter[] = [
       occupation_social_role: "Artistic director and co-founder of a small independent theatre in an old printing house in Ottakring.",
       appearance: "Tall and straight-backed, short dark hair with one grey streak. Always in black. Reading glasses pushed up on her head, ink stains on her fingers.",
       personality: "Composed, sharp-tongued and quietly controlling. Meets every crisis with dry irony and a to-do list. Warm with actors, cold with anyone who questions her theatre.",
-      biography: "Studied directing under Viktor in Vienna. When Mark and Anna drifted away after graduation, she stayed and founded the theatre. Has run it for twenty years without a break — and without a partner.",
+      biography: "Studied directing under Viktor in Vienna. When Mark and Anna drifted away after graduation, she stayed and founded the theatre. Has run it for twenty years without a break, and without a partner.",
       dramatic_role: "protagonist",
       dramatic_role_description: "Drives the central conflict: her fight to save the theatre forces the others to take sides and reopens the past they share.",
-      goal: "Save the theatre from closing when the city subsidy runs out in spring — by staging Viktor’s unfinished play as a tribute.",
+      goal: "Save the theatre from closing when the city subsidy runs out in spring, by staging Viktor’s unfinished play as a tribute.",
       motivation: "The theatre is her only proof that staying in Vienna was a choice, not a failure. Without it, her life would have no shape.",
       fear_weakness: "Fears that she stayed out of cowardice, not loyalty. Weakness: cannot delegate or accept help, even when she is visibly failing.",
-      internal_conflict: "Torn between loyalty to Viktor’s legacy and the suspicion that he held her back — that she never found a voice of her own.",
+      internal_conflict: "Torn between loyalty to Viktor’s legacy and the suspicion that he held her back, that she never found a voice of her own.",
       character_arc: "Moves from holding everything alone, convinced that letting go means failing, toward sharing the theatre with the people around her.",
     },
     relationships: [
-      { who: "Mark", description: "Old love, never spoken of. She resents that he left — and that he is doing well." },
+      { who: "Mark", description: "Old love, never spoken of. She resents that he left, and that he is doing well." },
       { who: "Anna", description: "Trusted ally for twenty years, but Elena envies her calm." },
       { who: "Viktor", description: "Mentor and father figure; his approval still rules her decisions." },
-      { who: "Pavel", description: "Useful and eager — not yet trusted with anything that matters." },
+      { who: "Pavel", description: "Useful and eager, not yet trusted with anything that matters." },
     ],
     card: {
       role_label: "protagonist",
@@ -58,7 +58,7 @@ export const SEED_CAST: SeedCharacter[] = [
       personality: "Charming, restless and practical. Talks about money to avoid talking about feelings. Generous in public, evasive in private.",
       biography: "Gave up acting a year after graduation and moved to Frankfurt. Built a successful event-production company. Divorced, one teenage son he rarely sees.",
       dramatic_role: "antagonist",
-      dramatic_role_description: "His money offers the theatre a way out — at the price of Elena’s independence.",
+      dramatic_role_description: "His money offers the theatre a way out, at the price of Elena’s independence.",
       goal: "Attend the funeral, settle an old debt with Viktor and leave Vienna before anyone asks why he never came back.",
       motivation: "Wants to prove to himself that leaving was the right choice, and to buy back a little of the respect he lost.",
       fear_weakness: "Fears that he sold out and that everyone in the room knows it. Weakness: buys his way out of every uncomfortable situation.",
@@ -68,7 +68,7 @@ export const SEED_CAST: SeedCharacter[] = [
     relationships: [
       { who: "Elena", description: "The love he walked away from; he still cannot look her in the eye." },
       { who: "Anna", description: "The only one he has written to for twenty years." },
-      { who: "Viktor", description: "Owed him money — and an apology." },
+      { who: "Viktor", description: "Owed him money, and an apology." },
       { who: "Pavel", description: "A useful ally for a deal." },
     ],
     card: {
@@ -76,7 +76,7 @@ export const SEED_CAST: SeedCharacter[] = [
       tagline: "Former classmate, now a businessman",
       traits: ["Charming", "Evasive", "Restless"],
       wants: "Settle his debt and leave again",
-      fears: "That he sold out — and everyone knows",
+      fears: "That he sold out, and everyone knows",
     },
   },
   {
@@ -91,8 +91,8 @@ export const SEED_CAST: SeedCharacter[] = [
       personality: "Quiet, observant and gently ironic. Listens more than she speaks; when she does speak, people remember it.",
       biography: "Stopped performing after a stage-fright crisis in her twenties. Became the theatre’s archivist and Viktor’s closest confidante in his last years.",
       dramatic_role: "confidant",
-      dramatic_role_description: "Holds Viktor’s letter — the truth that can reunite or break the group.",
-      goal: "Deliver Viktor’s final letter to Elena and Mark — and decide whether to reveal what it really says.",
+      dramatic_role_description: "Holds Viktor’s letter, the truth that can reunite or break the group.",
+      goal: "Deliver Viktor’s final letter to Elena and Mark, and decide whether to reveal what it really says.",
       motivation: "Owes Viktor her second life in the theatre and wants to keep her last promise to him.",
       fear_weakness: "Fears conflict and being the cause of it. Weakness: keeps secrets for so long that they turn into lies.",
       internal_conflict: "Torn between loyalty to Viktor’s last wishes and her friendship with Elena, whom the letter could hurt.",
@@ -159,7 +159,7 @@ export const SEED_CAST: SeedCharacter[] = [
       dramatic_role: "outsider",
       dramatic_role_description: "Sees the group without nostalgia and questions their loyalty to Viktor.",
       goal: "Sell her father’s flat and the rights to his manuscripts, and leave with some understanding of who he was.",
-      motivation: "Wants to close this chapter of her life — and quietly hopes to learn whether her father loved her.",
+      motivation: "Wants to close this chapter of her life, and quietly hopes to learn whether her father loved her.",
       fear_weakness: "Fears that her father loved his students more than her. Weakness: mistrusts everyone from the theatre world.",
       internal_conflict: "Wants to reject her father’s world, yet is drawn to the people who knew him best.",
       character_arc: "Moves from judging the theatre people from a safe distance toward recognising her father in them.",
@@ -191,8 +191,8 @@ export const SEED_CAST: SeedCharacter[] = [
       biography: "Moved from Brno to Vienna for a cultural-management degree. Hired by Elena three months ago after two internships at big state theatres.",
       dramatic_role: "wildcard",
       dramatic_role_description: "An accidental witness whose choices shift the balance of power.",
-      goal: "Secure new funding before spring — even if that means selling the theatre’s future to Mark.",
-      motivation: "Wants to prove that a manager can save art — and to belong to the world he admires.",
+      goal: "Secure new funding before spring, even if that means selling the theatre’s future to Mark.",
+      motivation: "Wants to prove that a manager can save art, and to belong to the world he admires.",
       fear_weakness: "Fears being seen as a mere clerk among artists. Weakness: tells people what they want to hear.",
       internal_conflict: "Admires Elena and her vision, but the numbers tell him her plan will fail.",
       character_arc: "Moves from telling everyone what they want to hear toward taking a side and speaking an uncomfortable truth.",

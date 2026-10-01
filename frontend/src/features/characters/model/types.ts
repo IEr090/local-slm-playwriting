@@ -1,4 +1,4 @@
-// Data model from README §5.1. `null` marks the empty state of a blank character.
+// Data model. `null` marks the empty state of a blank character.
 
 export type Gender = "female" | "male" | "other";
 export type DramaticRole =
@@ -46,7 +46,7 @@ export const DRAMATIC_ROLES: readonly DramaticRole[] = [
   "outsider", "wildcard", "mentor", "foil",
 ];
 
-/** Fields the card is generated from; a change here triggers a card update (README §4.5). */
+/** Fields the card is generated from; a change here triggers a card update. */
 export const CARD_SOURCE_FIELDS = [
   "dramatic_role",
   "occupation_social_role",

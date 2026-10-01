@@ -29,7 +29,7 @@ describe("traitsFrom", () => {
 });
 
 describe("generateCast", () => {
-  it("returns the six prototype characters with unique ids and a card each", async () => {
+  it("returns the six seed characters with unique ids and a card each", async () => {
     const { characters, cards } = await api.generateCast(DEFAULT_PREMISE);
     expect(characters.map((c) => `${c.name} ${c.surname}`)).toEqual([
       "Elena Hofbauer",
@@ -58,7 +58,7 @@ describe("generateCast", () => {
     const mark = characters[1];
     expect(elena.relationships[0]).toEqual({
       character_id: mark.id,
-      description: "Old love, never spoken of. She resents that he left — and that he is doing well.",
+      description: "Old love, never spoken of. She resents that he left, and that he is doing well.",
     });
   });
 

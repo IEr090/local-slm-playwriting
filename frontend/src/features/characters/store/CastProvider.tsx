@@ -11,7 +11,7 @@ import { useErrors } from "@/shared/errors/errors-context";
 import { ActionsContext, StateContext, type CastActions } from "./cast-context";
 import { initialState, reducer } from "./cast-reducer";
 
-/** Several changed characters update one after another (prototype: 2600 + i·700 ms). */
+/** Several changed characters update one after another. */
 const CARD_UPDATE_STAGGER_MS = 700;
 /** How long changed fields glow after an AI revision. */
 const HIGHLIGHT_MS = 2400;
@@ -22,7 +22,6 @@ export function CastProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { showError, dismissError } = useErrors();
 
-  // fresh state for async actions without recreating them on every change
   const stateRef = useRef(state);
   useLayoutEffect(() => {
     stateRef.current = state;
@@ -109,9 +108,8 @@ export function CastProvider({ children }: { children: ReactNode }) {
   // ---------- auto-save ----------
 
   /**
-   * Auto-save on leaving a character (README §4.5): save everything edited, then regenerate only
-   * the cards whose source fields changed — one after another (700 ms apart), each showing the
-   * updating overlay. A failed update keeps the old card and shows the error banner.
+   * Auto-save on leaving a character: save everything edited, then regenerate only the cards
+   * whose source fields changed, one after another, each showing the updating overlay.
    */
   const autoSave = useCallback(() => {
     const { cast, cards, cardSnapshot, updating, dirty } = stateRef.current;

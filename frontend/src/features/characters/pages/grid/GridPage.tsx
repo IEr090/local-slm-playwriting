@@ -7,7 +7,7 @@ import { CharacterCardView } from "./CharacterCardView";
 /** "Continue" toast: shown for 3 s. */
 const TOAST_MS = 3000;
 
-/** Page "/cast" — the cast grid "Dramatis Personae" (README §4.3). */
+/** Page "/cast": the cast grid "Dramatis Personae". */
 export function GridPage() {
   const { cast, cards, updating } = useCastState();
   const { newPremise, addBlank, openCharacter } = useCastActions();
@@ -45,7 +45,7 @@ export function GridPage() {
         ))}
       </div>
 
-      <Toast open={toast}>Cast approved. Next stage — Plot — arrives in Milestone 3.</Toast>
+      <Toast open={toast}>Cast approved. Next stage, Plot, arrives in Milestone 3.</Toast>
     </div>
   );
 }

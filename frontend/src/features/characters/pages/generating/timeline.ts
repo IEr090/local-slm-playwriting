@@ -1,4 +1,4 @@
-// Timing of the generation animation (README §4.2, startGeneration() in the prototype).
+// Timing of the generation animation.
 // Pure functions: widths are passed in, so the maths can be tested without a browser.
 
 /** Premise words flow along 584px in 2.9 s. */

@@ -1,4 +1,4 @@
-// Which edits require a new card (README §4.5).
+// Which edits require a new card.
 
 import { CARD_SOURCE_FIELDS, type CardSourceField, type Character } from "@/features/characters/model/types";
 

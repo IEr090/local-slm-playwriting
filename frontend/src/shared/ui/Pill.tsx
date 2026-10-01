@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/shared/lib/utils";
 
-/** Outlined pill button (`.pill` in the prototype). */
+/** Outlined pill button. */
 export function Pill({ className, ...props }: ComponentProps<"button">) {
   return (
     <button
@@ -16,7 +16,7 @@ export function Pill({ className, ...props }: ComponentProps<"button">) {
   );
 }
 
-/** Gold outlined pill — the main call to action (`.pill-gold`). */
+/** Gold outlined pill, the main call to action. */
 export function GoldPill({ className, ...props }: ComponentProps<"button">) {
   return (
     <button

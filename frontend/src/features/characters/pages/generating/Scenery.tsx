@@ -1,7 +1,7 @@
 // Background loops of the generating screen: fog, stars, axis with sparks, orrery.
-// Plain CSS keyframes (README §6 allows them for these infinite loops).
+// Plain CSS keyframes for these infinite loops.
 
-/** Stars from the prototype's seeded generator (seed 7), so they sit in the same places. */
+/** Stars from a seeded generator, so they always sit in the same places. */
 function makeStars() {
   let seed = 7;
   const rnd = () => {

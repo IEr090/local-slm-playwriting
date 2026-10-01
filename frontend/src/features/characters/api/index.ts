@@ -1,6 +1,6 @@
-// The one and only data source of the frontend (README §2).
+// The only data source of the frontend.
 // Everything here is mocked: fake delays instead of generation, text shortening instead of card generation.
-// UI components never create characters or cards themselves — they call these functions.
+// UI components never create characters or cards themselves, they call these functions.
 
 import type {
   Character,
@@ -37,7 +37,7 @@ function persist() {
       JSON.stringify({ characters: [...store.values()], cards: Object.fromEntries(cardStore) }),
     );
   } catch {
-    // storage unavailable (private mode, tests) — keep working in memory
+    // ignore
   }
 }
 
@@ -49,7 +49,7 @@ function restore() {
     saved.characters.forEach((c) => store.set(c.id, c));
     Object.entries(saved.cards).forEach(([id, card]) => cardStore.set(id, card));
   } catch {
-    // unreadable storage — start empty
+    // ignore
   }
 }
 restore();
@@ -67,7 +67,7 @@ export const BLANK_CARD: CharacterCard = {
 
 /**
  * Generates the whole cast for a premise. Returns all characters at once (no streaming).
- * The mock ignores the premise and always returns the six characters from the prototype.
+ * The mock ignores the premise and always returns the six seed characters.
  */
 async function generateCast(premise: string, { signal }: CallOptions = {}): Promise<GeneratedCast> {
   void premise;
@@ -156,7 +156,7 @@ async function reviseCharacter(
     decision: "accept_with_adjustments",
     changed_fields: ["personality"],
     character: revised,
-    text: `I reshaped ${revised.name}’s personality to reflect your note and kept the biography consistent. In the real app the Character Agent on the local SLM writes this change.`,
+    text: `I reshaped ${revised.name}’s personality to reflect your note and kept the biography consistent.`,
   };
 }
 

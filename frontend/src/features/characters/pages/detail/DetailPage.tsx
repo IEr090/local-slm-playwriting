@@ -7,7 +7,7 @@ import { ChatPanel } from "./chat/ChatPanel";
 import { DetailHeader } from "./DetailHeader";
 import { FieldGrid } from "./FieldGrid";
 
-/** Page "/cast/:id" — character detail: live header + scrollable field cards (README §4.4). */
+/** Page "/cast/:id": character detail with live header and scrollable field cards. */
 export function DetailPage() {
   const { id = "" } = useParams();
   const { loaded, cast, cards, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();

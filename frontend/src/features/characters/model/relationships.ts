@@ -1,11 +1,11 @@
-// Who can be picked in a relationship row (README §4.4, "Relationships").
+// Who can be picked in a relationship row.
 
 import type { Character, Relationship } from "@/features/characters/model/types";
 import { fullName } from "./text";
 
 /**
  * Characters offered for row `rowIndex`: never the character itself, never someone already linked
- * in another row, and — if `query` is set — only names where the first or last name (or the full name)
+ * in another row, and if `query` is set, only names where the first or last name (or the full name)
  * starts with the query.
  */
 export function relationOptions(
