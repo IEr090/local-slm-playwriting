@@ -11,7 +11,7 @@ Python 3.11 or newer.
 From the repository root:
 
 ```sh
-python3 src/anton/main.py
+python3 backend/src/anton/main.py
 ```
 
 Expected output:
@@ -22,8 +22,13 @@ Anton initialized.
 
 ## Project structure
 
-- `src/anton/`: Python package and application entry point.
-- `tests/`: Reserved for future tests.
+- `backend/src/anton/`: Python package and application entry point.
+  - `api/`: HTTP layer (routers, DTOs, mappers, exception handlers).
+  - `application/`: Business logic services.
+  - `domain/`: Domain models, independent of FastAPI and Ollama.
+  - `infrastructure/`: External integrations (config, SLM clients, prompts).
+- `backend/tests/`: Unit and integration tests.
+- `frontend/`: React frontend.
 
 ## Status
 

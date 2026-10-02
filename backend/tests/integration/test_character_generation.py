@@ -1,8 +1,8 @@
 from unittest import IsolatedAsyncioTestCase
 
-from anton.prompts import load_prompt
-from anton.schemas import Characters
-from anton.slm import OllamaClient
+from anton.domain.models import Characters
+from anton.infrastructure.prompts import load_prompt
+from anton.infrastructure.slm import OllamaClient
 
 
 USER_PROMPT = """The play takes place in Vienna in a small independent theatre that is close to bankruptcy.
