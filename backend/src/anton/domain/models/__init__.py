@@ -1,3 +1,10 @@
-from anton.domain.models.character import Character, Characters
+from anton.domain.models.character import (
+    Character,
+    CharacterCard,
+    Characters,
+    DramaticRole,
+    Gender,
+    Relationship,
+)
 
-__all__ = ["Character", "Characters"]
+__all__ = ["Character", "CharacterCard", "Characters", "DramaticRole", "Gender", "Relationship"]
