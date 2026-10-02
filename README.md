@@ -4,21 +4,20 @@ Local SLM-based multi-agent system for generating theatre plays.
 
 ## Requirements
 
-Python 3.11 or newer.
+- Python 3.11 or newer
+- [uv](https://docs.astral.sh/uv/)
+- [Ollama](https://ollama.com/) for character generation
 
 ## Run
 
-From the repository root:
+From the `backend/` directory:
 
 ```sh
-python3 backend/src/anton/main.py
+uv sync
+uv run fastapi dev src/anton/main.py
 ```
 
-Expected output:
-
-```text
-Anton initialized.
-```
+The API is served at `http://127.0.0.1:8000/api`, interactive docs at `http://127.0.0.1:8000/docs`.
 
 ## Project structure
 
@@ -32,4 +31,4 @@ Anton initialized.
 
 ## Status
 
-Minimal project setup. No external dependencies are required.
+Backend skeleton: FastAPI app with stubbed character endpoints.
