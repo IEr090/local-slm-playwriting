@@ -22,8 +22,9 @@ class OllamaClient(SLMClient):
         system_prompt: str,
         user_prompt: str,
         response_model: type[T],
+        think: bool,
     ) -> T:
-        """Generate and validate a structured response."""
+        """Generate and validate a structured response, optionally letting the model think first."""
         response = await self.client.chat(
             model=self.model,
             messages=[
@@ -37,6 +38,7 @@ class OllamaClient(SLMClient):
                 },
             ],
             format=response_model.model_json_schema(),
+            think=think,
         )
 
         return response_model.model_validate_json(response.message.content)

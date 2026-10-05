@@ -1,7 +1,7 @@
 from unittest import IsolatedAsyncioTestCase
 
-from anton.domain.models import Characters
-from anton.infrastructure.prompts import load_prompt
+from anton.application.character_service import CharacterService
+from anton.domain.models import Cast
 from anton.infrastructure.slm import OllamaClient
 
 
@@ -17,30 +17,33 @@ Create complete character profiles for all three characters."""
 
 
 class CharacterGenerationTest(IsolatedAsyncioTestCase):
-    """Test character generation against a local Ollama model."""
+    """Test cast generation against a local Ollama model."""
 
-    async def test_generates_all_characters(self) -> None:
-        """Generate and validate profiles for Elena, Mark, and Anna."""
-        client = OllamaClient(model="qwen3:4b")
+    async def test_generates_cast(self) -> None:
+        """Generate complete profiles and cards for Elena, Mark, and Anna."""
+        service = CharacterService(OllamaClient(model="qwen3:4b"))
 
-        characters = await client.generate(
-            system_prompt=load_prompt("character_generation.md"),
-            user_prompt=USER_PROMPT,
-            response_model=Characters,
-        )
+        cast = await service.generate_cast(USER_PROMPT)
 
-        self.assertEqual(len(characters.root), 3)
+        self.assert_characters(cast)
+        self.assert_relationships(cast)
+        self.assert_cards(cast)
+
+    def assert_characters(self, cast: Cast) -> None:
+        """Check that every character is present, keeps the given age, and has no empty fields."""
         self.assertEqual(
-            {character.name.casefold() for character in characters.root},
-            {"elena", "mark", "anna"},
+            {character.name.casefold(): character.age for character in cast.characters},
+            {"elena": 47, "mark": 31, "anna": 28},
         )
+        self.assertEqual(len({character.id for character in cast.characters}), 3)
+
         empty_fields = {
             character.name: [
                 field
                 for field, value in character.model_dump().items()
                 if isinstance(value, str) and not value.strip()
             ]
-            for character in characters.root
+            for character in cast.characters
         }
         empty_fields = {
             name: fields
@@ -52,3 +55,26 @@ class CharacterGenerationTest(IsolatedAsyncioTestCase):
             empty_fields,
             f"Generated characters contain empty fields: {empty_fields}",
         )
+
+    def assert_relationships(self, cast: Cast) -> None:
+        """Check that every relationship links to another character of the cast."""
+        ids = {character.id for character in cast.characters}
+
+        for character in cast.characters:
+            self.assertTrue(character.relationships, f"{character.name} has no relationships")
+            for relationship in character.relationships:
+                self.assertIn(
+                    relationship.character_id,
+                    ids - {character.id},
+                    f"{character.name} has an unlinked relationship: {relationship.description}",
+                )
+
+    def assert_cards(self, cast: Cast) -> None:
+        """Check that every character has a complete card."""
+        self.assertEqual(set(cast.cards), {character.id for character in cast.characters})
+
+        for character in cast.characters:
+            card = cast.cards[character.id]
+            self.assertEqual(card.role_label, character.dramatic_role)
+            self.assertEqual(len(card.traits), 3)
+            self.assertTrue(card.tagline.strip() and card.wants.strip() and card.fears.strip())

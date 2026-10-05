@@ -14,6 +14,7 @@ class SLMClient(Protocol):
         system_prompt: str,
         user_prompt: str,
         response_model: type[T],
+        think: bool,
     ) -> T:
-        """Generate and validate a structured response."""
+        """Generate and validate a structured response, optionally letting the model think first."""
         ...
