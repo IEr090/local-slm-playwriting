@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body
 
+from anton.api.dependencies import CharacterServiceDep
 from anton.api.dto.character_dto import CastResponse
 
 
@@ -9,9 +10,13 @@ router = APIRouter(prefix="/characters", tags=["characters"])
 
 
 @router.post("/generate", response_model=CastResponse)
-async def generate_cast(premise: Annotated[str, Body(embed=True, min_length=1)]) -> CastResponse:
+async def generate_cast(
+    premise: Annotated[str, Body(embed=True, min_length=1)],
+    service: CharacterServiceDep,
+) -> CastResponse:
     """Generate the whole cast with cards from a premise."""
-    raise NotImplementedError
+    characters, cards = await service.generate_cast(premise)
+    return CastResponse(characters=characters, cards=cards)
 
 
 @router.get("", response_model=CastResponse)
