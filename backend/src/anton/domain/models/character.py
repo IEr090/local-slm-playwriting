@@ -52,3 +52,10 @@ class CharacterCard(BaseModel):
     traits: list[str]
     wants: str
     fears: str
+
+
+class Cast(BaseModel):
+    """Represent the cast with a card for every character."""
+
+    characters: list[Character]
+    cards: dict[str, CharacterCard]
