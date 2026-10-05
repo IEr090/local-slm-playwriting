@@ -36,28 +36,40 @@ The provided information may be incomplete.
 
 # CHARACTER FIELDS
 
-For each character, fill in the following fields:
+For each character, fill in the following fields. Field keys are given in backticks.
 
 ## Basic Profile
 
-- **Name**: The character's name.
-- **Age**: The character's age.
-- **Gender**: The character's gender.
-- **Nationality / Background**: Nationality, cultural background, and relevant social background.
-- **Appearance**: A concise description of the character's appearance and distinctive physical features.
-- **Occupation / Social Role**: Profession, social position, and role in society.
-- **Personality**: Core personality traits and typical behavioural patterns.
-- **Biography**: Only the key past events that help explain the character's present behaviour.
+- `name`: First name only.
+- `surname`: Family name. If the user does not give one, invent a plausible surname that fits the setting.
+- `age`: Age in whole years. If the user gives an approximate age, choose a specific number that matches it.
+- `gender`: One of `female`, `male`, `other`.
+- `nationality_background`: Nationality, cultural background, and relevant social background.
+- `appearance`: A concise description of the character's appearance and distinctive physical features.
+- `occupation_social_role`: Profession, social position, and role in society.
+- `personality`: Core personality traits and typical behavioural patterns.
+- `biography`: Only the key past events that help explain the character's present behaviour.
 
 ## Dramatic Profile
 
-- **Dramatic Role**: The character's function in the story and contribution to the central conflict.
-- **Goal**: What the character wants to achieve.
-- **Motivation**: Why this goal matters to the character.
-- **Fear / Weakness**: The character's main fear, weakness, or vulnerability.
-- **Internal Conflict**: The character's main internal contradiction.
-- **Relationships**: Important relationships with other characters and the dynamics of those relationships.
-- **Character Arc**: A possible direction of the character's development rather than a predetermined ending.
+- `dramatic_role`: Exactly one of:
+    - `protagonist`: drives the central conflict and has the most at stake;
+    - `antagonist`: actively opposes the protagonist's goal;
+    - `confidant`: someone the protagonist trusts and reveals themselves to;
+    - `catalyst`: triggers change or sets events in motion;
+    - `outsider`: stands apart from the group and sees it from outside;
+    - `wildcard`: unpredictable, can shift the balance either way;
+    - `mentor`: guides or teaches another character;
+    - `foil`: contrasts with another character and highlights their traits.
+- `dramatic_role_description`: How this character drives or blocks the central conflict.
+- `goal`: What the character wants to achieve.
+- `motivation`: Why this goal matters to the character.
+- `fear_weakness`: The character's main fear, weakness, or vulnerability.
+- `internal_conflict`: The character's main internal contradiction.
+- `character_arc`: A possible direction of the character's development rather than a predetermined ending.
+- `relationships`: A list of the character's important relationships with **other characters from this cast**. For each one:
+    - `name` and `surname`: the other character's name and surname, written exactly as in their own profile;
+    - `description`: what they want from each other, what prevents them from getting it, and how power is distributed.
 
 # CHARACTER CREATION PRINCIPLES
 
@@ -108,7 +120,9 @@ Describe what belief, behaviour, relationship, or vulnerability the events of th
 
 Create one structured profile for each identified character.
 
-Use only the fields listed in the **Character Fields** section.
+Return a JSON array with one object per character, using exactly the field keys listed in the **Character Fields** section.
+
+Every relationship must reference a character who has their own profile in the same array.
 
 Do not add extra categories or fields.
 
