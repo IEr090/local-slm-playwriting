@@ -69,7 +69,9 @@ For each character, fill in the following fields. Field keys are given in backti
 - `character_arc`: A possible direction of the character's development rather than a predetermined ending.
 - `relationships`: A list of the character's important relationships with **other characters from this cast**. For each one:
     - `name` and `surname`: the other character's name and surname, written exactly as in their own profile;
-    - `description`: what they want from each other, what prevents them from getting it, and how power is distributed.
+    - `description`: written from the point of view of the character who owns this profile: what this character wants from the other one, how this character sees them, what prevents this character from getting it, and how power is distributed between them. Write it in the third person, not as "I".
+- Describe each relationship separately in both profiles. The same relationship must never have identical wording in two profiles, because each side sees it differently.
+- Do not swap who thinks or feels what. If the user says that one character believes something about another, keep it on that character's side.
 
 # CHARACTER CREATION PRINCIPLES
 
