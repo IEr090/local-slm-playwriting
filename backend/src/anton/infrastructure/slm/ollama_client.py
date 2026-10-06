@@ -12,9 +12,10 @@ T = TypeVar("T", bound=BaseModel)
 class OllamaClient(SLMClient):
     """Implement structured SLM generation with Ollama."""
 
-    def __init__(self, model: str) -> None:
-        """Initialize the client with an Ollama model name."""
+    def __init__(self, model: str, num_ctx: int) -> None:
+        """Initialize the client with an Ollama model name and its context window size in tokens."""
         self.model = model
+        self.num_ctx = num_ctx
         self.client = AsyncClient()
 
     async def generate(
@@ -39,6 +40,7 @@ class OllamaClient(SLMClient):
             ],
             format=response_model.model_json_schema(),
             think=think,
+            options={"num_ctx": self.num_ctx},
         )
 
         return response_model.model_validate_json(response.message.content)

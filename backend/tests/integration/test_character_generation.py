@@ -21,7 +21,7 @@ class CharacterGenerationTest(IsolatedAsyncioTestCase):
 
     async def test_generates_cast(self) -> None:
         """Generate complete profiles and cards for Elena, Mark, and Anna."""
-        service = CharacterService(OllamaClient(model="qwen3:4b"))
+        service = CharacterService(OllamaClient(model="qwen3:4b", num_ctx=16384))
 
         cast = await service.generate_cast(USER_PROMPT)
 
@@ -31,9 +31,13 @@ class CharacterGenerationTest(IsolatedAsyncioTestCase):
 
     def assert_characters(self, cast: Cast) -> None:
         """Check that every character is present, keeps the given age, and has no empty fields."""
+        generated = [(character.name, character.surname, character.age) for character in cast.characters]
+
+        self.assertEqual(len(cast.characters), 3, f"Generated characters: {generated}")
         self.assertEqual(
             {character.name.casefold(): character.age for character in cast.characters},
             {"elena": 47, "mark": 31, "anna": 28},
+            f"Generated characters: {generated}",
         )
         self.assertEqual(len({character.id for character in cast.characters}), 3)
 
