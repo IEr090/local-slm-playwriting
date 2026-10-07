@@ -56,3 +56,15 @@ class FakeSLMClient:
             "think": think,
         })
         return self.response
+
+
+class FailingSLMClient:
+    """Raise the prepared error on every call."""
+
+    def __init__(self, error: Exception) -> None:
+        """Initialize the client with the error it always raises."""
+        self.error = error
+
+    async def generate(self, system_prompt: str, user_prompt: str, response_model: type[T], think: bool) -> T:
+        """Raise the prepared error."""
+        raise self.error

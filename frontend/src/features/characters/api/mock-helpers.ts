@@ -42,21 +42,19 @@ export function mockCard(character: Character, previous: CharacterCard): Charact
 
 // ---------- errors ----------
 
-export type MockCall = "generate" | "card" | "chat";
+export type MockCall = "card" | "chat";
 
 const OLLAMA_DOWN = "Connection refused · localhost:11434";
 
 export const FAILURES: Record<MockCall, () => ApiError> = {
-  generate: () => new ApiError("Could not reach the local model. Is Ollama running?", `${OLLAMA_DOWN} · your premise is kept`),
   card: () => new ApiError("Could not update the character card. Is Ollama running?", `${OLLAMA_DOWN} · the previous card is kept`),
   chat: () => new ApiError("The AI could not revise this character. Is Ollama running?", `${OLLAMA_DOWN} · your edits are kept`),
 };
 
-// ---------- configuration: ?fail=generate|card|chat, ?genDelay=ms ----------
+// ---------- configuration: ?fail=card|chat ----------
 
 export interface MockConfig {
   fail: ReadonlySet<MockCall>;
-  generateDelayMs: number;
   /** Multiplies every delay; tests set it to 0. */
   delayScale: number;
 }
@@ -65,11 +63,9 @@ function fromUrl(): MockConfig {
   const params = new URLSearchParams(globalThis.location?.search ?? "");
   const fail = (params.get("fail") ?? "")
     .split(",")
-    .filter((x): x is MockCall => x === "generate" || x === "card" || x === "chat");
-  const genDelay = Number(params.get("genDelay"));
+    .filter((x): x is MockCall => x === "card" || x === "chat");
   return {
     fail: new Set(fail),
-    generateDelayMs: Number.isFinite(genDelay) && genDelay > 0 ? genDelay : 4500,
     delayScale: 1,
   };
 }
