@@ -38,8 +38,13 @@ export interface Flowing {
   delay: number;
 }
 
+/** The first MAX_WORDS words of the premise; a cut premise ends with "…" so the cut is visible. */
 export function premiseWords(premise: string): string[] {
-  return premise.split(/\s+/).filter(Boolean).slice(0, MAX_WORDS);
+  const all = premise.split(/\s+/).filter(Boolean);
+  if (all.length <= MAX_WORDS) return all;
+  const words = all.slice(0, MAX_WORDS);
+  words[MAX_WORDS - 1] = `${words[MAX_WORDS - 1].replace(/[.,;:!?…]+$/, "")}…`;
+  return words;
 }
 
 /**
