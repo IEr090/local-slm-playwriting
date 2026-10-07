@@ -8,7 +8,7 @@ Your task is to read one character profile and condense it into a short card tha
 
 # INPUT
 
-The user provides one character profile as JSON.
+The user provides the card source fields of one character profile as JSON: `dramatic_role`, `occupation_social_role`, `personality`, `goal`, `motivation` and `fear_weakness`.
 
 Some fields of the profile may be empty.
 
@@ -29,7 +29,7 @@ Fill in the following fields. Field keys are given in backticks.
 - Do not repeat the character's name in the card.
 - Choose traits that describe how the character behaves, not their job or social position.
 - Make the three traits clearly different from one another.
-- If the source field is empty, infer the value from the rest of the profile.
+- If the source field is empty, infer the value from the other fields.
 
 # OUTPUT
 

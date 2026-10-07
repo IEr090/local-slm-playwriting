@@ -17,10 +17,9 @@ class Relationship(BaseModel):
     description: str
 
 
-class Character(BaseModel):
-    """Represent a generated character."""
+class CharacterDraft(BaseModel):
+    """Represent a character profile that has no id yet."""
 
-    id: str
     name: str
     surname: str
     age: int | None
@@ -40,6 +39,12 @@ class Character(BaseModel):
     relationships: list[Relationship]
 
 
+class Character(CharacterDraft):
+    """Represent a generated character."""
+
+    id: str
+
+
 class Characters(RootModel[list[Character]]):
     """Represent a collection of generated characters."""
 
@@ -52,6 +57,13 @@ class CharacterCard(BaseModel):
     traits: list[str]
     wants: str
     fears: str
+
+
+class CharacterWithCard(BaseModel):
+    """Represent a character together with its grid card."""
+
+    character: Character
+    card: CharacterCard
 
 
 class Cast(BaseModel):

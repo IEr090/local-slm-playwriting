@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body
 
 from anton.api.dependencies import CharacterServiceDep
-from anton.domain.models import Cast
+from anton.domain.models import Cast, CharacterDraft, CharacterWithCard
 
 
 router = APIRouter(prefix="/characters", tags=["characters"])
@@ -25,20 +25,14 @@ async def get_cast() -> Cast:
 
 
 @router.post("")
-async def create_blank_character() -> None:
-    """Create an empty character with a placeholder card."""
-    raise NotImplementedError
+async def create_character(draft: CharacterDraft, service: CharacterServiceDep) -> CharacterWithCard:
+    """Create a character from the user's profile and generate its card."""
+    return await service.create_character(draft)
 
 
 @router.put("/{character_id}")
-async def save_character(character_id: str) -> None:
-    """Store the edited character."""
-    raise NotImplementedError
-
-
-@router.post("/{character_id}/card")
-async def generate_card(character_id: str) -> None:
-    """Regenerate the grid card from the character profile."""
+async def edit_character(character_id: str) -> None:
+    """Update the character and regenerate its card."""
     raise NotImplementedError
 
 
