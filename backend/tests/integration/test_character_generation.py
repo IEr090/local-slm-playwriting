@@ -2,7 +2,7 @@ from unittest import IsolatedAsyncioTestCase
 
 from anton.application.character_service import CharacterService
 from anton.domain.models import Cast
-from anton.infrastructure.slm import OllamaClient
+from tests.integration import create_test_client
 
 
 USER_PROMPT = """The play takes place in Vienna in a small independent theatre that is close to bankruptcy.
@@ -21,7 +21,7 @@ class CharacterGenerationTest(IsolatedAsyncioTestCase):
 
     async def test_generates_cast(self) -> None:
         """Generate complete profiles and cards for Elena, Mark, and Anna."""
-        service = CharacterService(OllamaClient(model="qwen3:4b", num_ctx=16384))
+        service = CharacterService(create_test_client())
 
         cast = await service.generate_cast(USER_PROMPT)
 

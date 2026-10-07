@@ -47,3 +47,23 @@ class OllamaClientErrorTest(IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(SLMResponseError, "invalid GeneratedCard"):
             await self.generate()
+
+
+class OllamaClientThinkingTest(IsolatedAsyncioTestCase):
+    """Test the thinking switch of the client."""
+
+    async def think_sent(self, thinking: bool, think: bool) -> bool:
+        """Return the think flag that reaches Ollama."""
+        client = OllamaClient(model="qwen3:4b", num_ctx=1024, thinking=thinking)
+        client.client.chat = AsyncMock(return_value=SimpleNamespace(message=SimpleNamespace(content=CARD.model_dump_json())))
+        await client.generate("system", "user", GeneratedCard, think=think)
+        return client.client.chat.call_args.kwargs["think"]
+
+    async def test_passes_the_requested_flag(self) -> None:
+        """Let the caller decide when thinking is switched on."""
+        self.assertTrue(await self.think_sent(thinking=True, think=True))
+        self.assertFalse(await self.think_sent(thinking=True, think=False))
+
+    async def test_switched_off_thinking_wins(self) -> None:
+        """Never think when thinking is switched off, even if the caller asks for it."""
+        self.assertFalse(await self.think_sent(thinking=False, think=True))

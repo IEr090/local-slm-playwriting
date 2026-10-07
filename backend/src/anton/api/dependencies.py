@@ -4,13 +4,20 @@ from typing import Annotated
 from fastapi import Depends
 
 from anton.application.character_service import CharacterService
-from anton.infrastructure.slm import OllamaClient, SLMClient
+from anton.infrastructure.config import Settings
+from anton.infrastructure.slm import SLMClient, create_slm_client
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Read the settings once for the whole application."""
+    return Settings()
 
 
 @lru_cache
 def get_slm_client() -> SLMClient:
-    """Create one Ollama client for the whole application."""
-    return OllamaClient(model="qwen3:4b", num_ctx=16384)
+    """Create one model client for the whole application."""
+    return create_slm_client(get_settings())
 
 
 def get_character_service(client: Annotated[SLMClient, Depends(get_slm_client)]) -> CharacterService:

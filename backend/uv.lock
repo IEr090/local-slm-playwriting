@@ -432,6 +432,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "ollama" },
     { name = "pydantic" },
+    { name = "pydantic-settings" },
 ]
 
 [package.metadata]
@@ -439,6 +440,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"] },
     { name = "ollama" },
     { name = "pydantic", specifier = ">=2" },
+    { name = "pydantic-settings", specifier = ">=2.15.0" },
 ]
 
 [[package]]

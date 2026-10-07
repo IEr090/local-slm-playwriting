@@ -13,10 +13,11 @@ T = TypeVar("T", bound=BaseModel)
 class OllamaClient(SLMClient):
     """Implement structured SLM generation with Ollama."""
 
-    def __init__(self, model: str, num_ctx: int) -> None:
-        """Initialize the client with an Ollama model name and its context window size in tokens."""
+    def __init__(self, model: str, num_ctx: int, thinking: bool = True) -> None:
+        """Initialize the client with an Ollama model name, its context window size in tokens, and whether thinking is allowed."""
         self.model = model
         self.num_ctx = num_ctx
+        self.thinking = thinking
         self.client = AsyncClient()
 
     async def generate(
@@ -26,7 +27,10 @@ class OllamaClient(SLMClient):
         response_model: type[T],
         think: bool,
     ) -> T:
-        """Generate and validate a structured response, optionally letting the model think first."""
+        """Generate and validate a structured response, optionally letting the model think first.
+
+        When thinking is switched off in the settings, the model never thinks, whatever the caller asks.
+        """
         try:
             response = await self.client.chat(
                 model=self.model,
@@ -41,7 +45,7 @@ class OllamaClient(SLMClient):
                     },
                 ],
                 format=response_model.model_json_schema(),
-                think=think,
+                think=think and self.thinking,
                 options={"num_ctx": self.num_ctx},
             )
         except ConnectionError as error:
