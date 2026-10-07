@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
 
 from anton.api.dependencies import CharacterServiceDep
+from anton.api.disconnect import cancel_on_disconnect
 from anton.domain.models import Cast, CharacterDraft, CharacterWithCard
 
 
@@ -13,9 +14,10 @@ router = APIRouter(prefix="/characters", tags=["characters"])
 async def generate_cast(
     premise: Annotated[str, Body(embed=True, min_length=1)],
     service: CharacterServiceDep,
+    request: Request,
 ) -> Cast:
-    """Generate the whole cast with cards from a premise."""
-    return await service.generate_cast(premise)
+    """Generate the whole cast with cards from a premise; stop generating if the client cancels."""
+    return await cancel_on_disconnect(request, service.generate_cast(premise))
 
 
 @router.get("")

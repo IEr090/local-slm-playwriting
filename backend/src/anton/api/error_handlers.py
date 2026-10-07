@@ -1,11 +1,17 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from anton.api.disconnect import ClientDisconnectedError
 from anton.infrastructure.slm import SLMResponseError, SLMUnavailableError
 
 
 def add_error_handlers(app: FastAPI) -> None:
     """Turn model failures into responses with a message for the user and a technical detail."""
+
+    @app.exception_handler(ClientDisconnectedError)
+    async def client_disconnected(request: Request, error: ClientDisconnectedError) -> Response:
+        """Answer 499 (client closed request) for the log; nobody is left to read it."""
+        return Response(status_code=499)
 
     @app.exception_handler(SLMUnavailableError)
     async def slm_unavailable(request: Request, error: SLMUnavailableError) -> JSONResponse:
