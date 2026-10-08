@@ -10,10 +10,22 @@ import {
 } from "./timeline";
 
 describe("premiseWords", () => {
-  it("takes the first 18 words", () => {
+  it("keeps a short premise as it is", () => {
+    expect(premiseWords("  An   independent theatre. ")).toEqual(["An", "independent", "theatre."]);
+    const exact = Array.from({ length: 18 }, (_, i) => `w${i}`);
+    expect(premiseWords(exact.join(" "))).toEqual(exact);
+  });
+
+  it("takes the first 18 words and marks the cut with …", () => {
     const text = Array.from({ length: 30 }, (_, i) => `w${i}`).join("  ");
-    expect(premiseWords(text)).toHaveLength(18);
-    expect(premiseWords("  An   independent theatre ")).toEqual(["An", "independent", "theatre"]);
+    const words = premiseWords(text);
+    expect(words).toHaveLength(18);
+    expect(words.at(-1)).toBe("w17…");
+  });
+
+  it("replaces punctuation at the cut instead of stacking it", () => {
+    const text = `${Array.from({ length: 17 }, (_, i) => `w${i}`).join(" ")} autumn. More text`;
+    expect(premiseWords(text).at(-1)).toBe("autumn…");
   });
 });
 
