@@ -110,10 +110,11 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
           ))}
         </div>
         <TextField
-          rows={2}
+          rows={1}
           label="Dramatic role description"
           placeholder="Describe the role in the play"
           invalid={invalid.includes("dramatic_role_description")}
+          lined
           value={c.dramatic_role_description}
           onChange={(value) => onChange({ dramatic_role_description: value })}
           className="text-ink-2"
