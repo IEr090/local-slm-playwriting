@@ -20,8 +20,10 @@ export interface CastActions {
   characterOpened(): void;
   /** Inline edit of one character (every field is always editable). */
   updateCharacter(id: string, patch: Partial<Omit<Character, "id">>): void;
-  /** "ALL CHARACTERS": back to /cast; leaving a character triggers the auto-save. */
+  /** "ALL CHARACTERS": back to /cast; leaving a character drops its unsaved edits. */
   leaveToGrid(): void;
+  /** CREATE / SAVE: back to /cast while the character is saved; on failure back to the character. */
+  saveCharacter(id: string): Promise<void>;
   /** "← New premise": back to the prompt. */
   newPremise(): void;
   toggleChat(): void;

@@ -1,17 +1,26 @@
 import { motion } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router";
+import { isEmptyProfile, missingFields, missingLabels, sameProfile } from "@/features/characters/model/validation";
 import { paths } from "@/features/characters/paths";
+import { ApiError } from "@/shared/api/errors";
+import { useErrors } from "@/shared/errors/errors-context";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
 import { ChatPanel } from "./chat/ChatPanel";
 import { DetailHeader } from "./DetailHeader";
 import { FieldGrid } from "./FieldGrid";
+import { LeaveDialog } from "./LeaveDialog";
 
 /** Page "/cast/:id": character detail with live header and scrollable field cards. */
 export function DetailPage() {
   const { id = "" } = useParams();
-  const { loaded, cast, cards, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();
-  const { characterOpened, updateCharacter, leaveToGrid, toggleChat, setDraft, sendRevision } = useCastActions();
+  const { loaded, cast, cards, saved, chatOpen, chats, draft, aiTypingFor, highlight } = useCastState();
+  const { characterOpened, updateCharacter, leaveToGrid, saveCharacter, toggleChat, setDraft, sendRevision } =
+    useCastActions();
+  const { showError } = useErrors();
+  // CREATE / SAVE was pressed with empty required fields: they turn red and the button stays off until filled
+  const [attemptedFor, setAttemptedFor] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const index = cast.findIndex((c) => c.id === id);
   const character = cast[index];
 
@@ -23,6 +32,24 @@ export function DetailPage() {
   if (!loaded) return null; // the saved cast is still being read after a reload
   if (!character) return <Navigate to={paths.cast} replace />;
 
+  const savedVersion = saved[character.id];
+  const isNew = !savedVersion;
+  const changed = isNew ? !isEmptyProfile(character) : !sameProfile(character, savedVersion);
+  const missing = missingFields(character);
+  const attempted = attemptedFor === character.id;
+
+  const save = () => {
+    if (!missing.length) return void saveCharacter(character.id);
+    setAttemptedFor(character.id);
+    showError(
+      new ApiError(
+        `Fill in all required fields to ${isNew ? "create" : "save"} the character.`,
+        `Missing: ${missingLabels(missing)}`,
+      ),
+    );
+  };
+  const leave = () => (changed ? setLeaving(true) : leaveToGrid());
+
   return (
     <div className="absolute inset-0 flex">
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -33,7 +60,10 @@ export function DetailPage() {
           index={index}
           total={cast.length}
           chatOpen={chatOpen}
-          onAll={leaveToGrid}
+          saveLabel={isNew ? "CREATE" : "SAVE"}
+          saveDisabled={!changed || (attempted && missing.length > 0)}
+          onAll={leave}
+          onSave={save}
           onToggleChat={toggleChat}
         />
 
@@ -41,10 +71,12 @@ export function DetailPage() {
           <FieldGrid
             key={character.id}
             character={character}
-            cast={cast}
+            // a character that is not created yet cannot be linked
+            cast={cast.filter((c) => c.id in saved)}
             cards={cards}
             onChange={(patch) => updateCharacter(character.id, patch)}
             highlighted={highlight?.id === character.id ? highlight.fields : undefined}
+            invalid={attempted ? missing : undefined}
           />
         </motion.div>
       </div>
@@ -56,6 +88,15 @@ export function DetailPage() {
         draft={draft}
         onDraftChange={setDraft}
         onSend={() => void sendRevision(character.id)}
+      />
+      <LeaveDialog
+        open={leaving}
+        isNew={isNew}
+        onStay={() => setLeaving(false)}
+        onLeave={() => {
+          setLeaving(false);
+          leaveToGrid();
+        }}
       />
     </div>
   );

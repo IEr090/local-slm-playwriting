@@ -37,11 +37,11 @@ describe("generateCast", () => {
 });
 
 describe("createBlankCharacter", () => {
-  it("creates an empty 'New Character' with the placeholder card", async () => {
+  it("creates an empty character with the placeholder card", async () => {
     const { character, card } = await api.createBlankCharacter();
     expect(character).toMatchObject({
-      name: "New",
-      surname: "Character",
+      name: "",
+      surname: "",
       age: null,
       gender: null,
       dramatic_role: null,
@@ -85,6 +85,21 @@ describe("?fail=…", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).message).toBe(message);
     expect((error as ApiError).detail).toContain("localhost:11434");
+  });
+});
+
+describe("createCharacter", () => {
+  it("posts the profile without the temporary id and returns the character with its new id and card", async () => {
+    const elena = seedCast()[0];
+    const answer = { character: { ...elena, id: "backend-id" }, card: SEED_CAST[0].card };
+    const fetch = vi.fn().mockResolvedValue(Response.json(answer));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(api.createCharacter(elena)).resolves.toEqual(answer);
+    const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/api/characters");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).not.toHaveProperty("id");
   });
 });
 

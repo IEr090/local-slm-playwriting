@@ -1,6 +1,6 @@
 // The only data source of the frontend.
-// getCast, generateCast and saveCharacter call the backend. Creating a blank character and the
-// AI revision are still mocked. UI components never create characters or cards themselves, they call these functions.
+// Everything except the AI revision calls the backend. A blank character only exists on the frontend
+// until it is created. UI components never create characters or cards themselves, they call these functions.
 
 import type {
   Character,
@@ -42,12 +42,12 @@ async function generateCast(premise: string, { signal }: CallOptions = {}): Prom
   return postJson<GeneratedCast>("/api/characters/generate", { premise }, { signal });
 }
 
-/** Creates an empty character ("New Character") with its placeholder card. */
+/** An empty character with its placeholder card, only on the frontend until `createCharacter`. */
 async function createBlankCharacter(): Promise<CharacterWithCard> {
   const character: Character = {
     id: newId(),
-    name: "New",
-    surname: "Character",
+    name: "",
+    surname: "",
     age: null,
     gender: null,
     nationality_background: "",
@@ -90,6 +90,13 @@ async function reviseCharacter(
   };
 }
 
+/** Creates the character on the backend; it gets a new id and a generated card. */
+async function createCharacter(character: Character): Promise<CharacterWithCard> {
+  const { id, ...draft } = character;
+  void id;
+  return postJson<CharacterWithCard>("/api/characters", draft);
+}
+
 /**
  * Saves the edited character. The backend regenerates its card only if the card source fields changed,
  * so the answer may take as long as a card generation.
@@ -108,6 +115,7 @@ export const api = {
   getCast,
   generateCast,
   createBlankCharacter,
+  createCharacter,
   reviseCharacter,
   saveCharacter,
 };

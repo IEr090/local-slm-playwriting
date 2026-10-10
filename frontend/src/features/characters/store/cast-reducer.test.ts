@@ -21,12 +21,12 @@ describe("cast reducer", () => {
     expect(after.chats).toEqual({});
   });
 
-  it("appends a blank character with its card and snapshot", () => {
+  it("appends a blank character with its card, not saved yet", () => {
     const withTwo = { ...initialState, cast: [character("a"), character("b")] };
     const after = reducer(withTwo, { type: "characterAdded", character: character("new"), card: BLANK_CARD });
     expect(after.cast.map((c) => c.id)).toEqual(["a", "b", "new"]);
     expect(after.cards.new).toEqual(BLANK_CARD);
-    expect(after.cardSnapshot.new).toBeDefined();
+    expect(after.saved.new).toBeUndefined();
   });
 
   it("loads the saved cast once, but never over a cast that is already there", () => {
@@ -94,44 +94,76 @@ describe("cast reducer", () => {
     expect(reducer(done, { type: "generationEnded" }).generation).toBe("idle");
   });
 
-  describe("auto-save and card update", () => {
+  describe("saving", () => {
     const elena = { ...character("elena"), personality: "Calm", goal: "Win" } as Character;
     const generated = reducer(initialState, { type: "castGenerated", characters: [elena], cards: { elena: BLANK_CARD } });
+    const edited = reducer(generated, { type: "updateCharacter", id: "elena", patch: { goal: "Lose" } });
 
-    it("snapshots the card sources on generation and marks edits dirty", () => {
-      expect(generated.cardSnapshot.elena).toMatchObject({ personality: "Calm", goal: "Win" });
-      const edited = reducer(generated, { type: "updateCharacter", id: "elena", patch: { goal: "Lose" } });
-      expect(edited.dirty).toEqual(["elena"]);
-      expect(reducer(edited, { type: "saved", ids: ["elena"] }).dirty).toEqual([]);
+    it("keeps the saved version apart from the edited one", () => {
+      expect(edited.saved.elena.goal).toBe("Win");
+      expect(edited.cast[0].goal).toBe("Lose");
     });
 
-    it("replaces the card and the snapshot when the update arrives", () => {
-      const updating = reducer(generated, { type: "cardsUpdating", ids: ["elena"] });
-      expect(updating.updating).toEqual(["elena"]);
+    it("marks the character saving, and updating only if its card is regenerated", () => {
+      const quick = reducer(edited, { type: "saveStarted", id: "elena", regenerates: false });
+      expect(quick).toMatchObject({ saving: ["elena"], updating: [] });
+      const slow = reducer(edited, { type: "saveStarted", id: "elena", regenerates: true });
+      expect(slow).toMatchObject({ saving: ["elena"], updating: ["elena"] });
+    });
+
+    it("stores the saved version and the new card when the save succeeds", () => {
+      const saving = reducer(edited, { type: "saveStarted", id: "elena", regenerates: true });
       const card = { ...BLANK_CARD, tagline: "New" };
-      const done = reducer(updating, {
-        type: "cardUpdated",
-        id: "elena",
-        card,
-        sources: { ...generated.cardSnapshot.elena, goal: "Lose" },
-      });
-      expect(done.updating).toEqual([]);
+      const done = reducer(saving, { type: "characterSaved", id: "elena", character: edited.cast[0], card });
+      expect(done).toMatchObject({ saving: [], updating: [] });
+      expect(done.saved.elena.goal).toBe("Lose");
       expect(done.cards.elena).toBe(card);
-      expect(done.cardSnapshot.elena.goal).toBe("Lose");
     });
 
-    it("keeps the old card when the update fails", () => {
-      const updating = reducer(generated, { type: "cardsUpdating", ids: ["elena"] });
-      const failed = reducer(updating, { type: "cardUpdateFailed", id: "elena" });
-      expect(failed.updating).toEqual([]);
+    it("replaces the temporary id of a created character with the backend id", () => {
+      let state = reducer(generated, { type: "characterAdded", character: character("temp"), card: BLANK_CARD });
+      state = { ...state, chats: { temp: [{ role: "user", text: "hi" }] } };
+      state = reducer(state, { type: "saveStarted", id: "temp", regenerates: true });
+      const card = { ...BLANK_CARD, tagline: "Created" };
+      state = reducer(state, { type: "characterSaved", id: "temp", character: character("real"), card });
+      expect(state.cast.map((c) => c.id)).toEqual(["elena", "real"]);
+      expect(state.cards.temp).toBeUndefined();
+      expect(state.cards.real).toBe(card);
+      expect(state.saved.real).toBeDefined();
+      expect(state.chats).toEqual({ real: [{ role: "user", text: "hi" }] });
+      expect(state.saving).toEqual([]);
+    });
+
+    it("keeps the edits when the save fails", () => {
+      const saving = reducer(edited, { type: "saveStarted", id: "elena", regenerates: true });
+      const failed = reducer(saving, { type: "saveFailed", id: "elena" });
+      expect(failed).toMatchObject({ saving: [], updating: [] });
+      expect(failed.cast[0].goal).toBe("Lose");
       expect(failed.cards.elena).toBe(BLANK_CARD);
     });
 
-    it("ignores a late card for a character that no longer exists", () => {
-      const updating = reducer(generated, { type: "cardsUpdating", ids: ["gone"] });
-      const late = reducer(updating, { type: "cardUpdated", id: "gone", card: BLANK_CARD, sources: generated.cardSnapshot.elena });
+    it("ignores a late save for a character that no longer exists", () => {
+      const saving = reducer(generated, { type: "saveStarted", id: "gone", regenerates: true });
+      const late = reducer(saving, { type: "characterSaved", id: "gone", character: character("gone"), card: BLANK_CARD });
       expect(late.cards.gone).toBeUndefined();
-      expect(late.updating).toEqual([]);
+      expect(late.saving).toEqual([]);
+    });
+
+    it("drops the edits when the character is left without saving", () => {
+      const left = reducer(edited, { type: "characterLeft", id: "elena" });
+      expect(left.cast[0]).toBe(generated.saved.elena);
+    });
+
+    it("drops a new character that is left without creating it", () => {
+      const added = reducer(generated, { type: "characterAdded", character: character("temp"), card: BLANK_CARD });
+      const left = reducer(added, { type: "characterLeft", id: "temp" });
+      expect(left.cast.map((c) => c.id)).toEqual(["elena"]);
+      expect(left.cards.temp).toBeUndefined();
+    });
+
+    it("keeps a character that is being saved when the page is left", () => {
+      const saving = reducer(edited, { type: "saveStarted", id: "elena", regenerates: false });
+      expect(reducer(saving, { type: "characterLeft", id: "elena" })).toBe(saving);
     });
   });
 });

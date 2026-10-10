@@ -11,12 +11,14 @@ interface FieldCardProps {
   compact?: boolean;
   /** Gold glow after an AI revision changed this field. */
   highlighted?: boolean;
+  /** Red border: a required field left empty after CREATE / SAVE was pressed. */
+  invalid?: boolean;
   className?: string;
   children: ReactNode;
 }
 
 /** A field card (`.fcard`): gold border while focused, stretches with its grid row. */
-export function FieldCard({ num, label, hint, compact, highlighted, className, children }: FieldCardProps) {
+export function FieldCard({ num, label, hint, compact, highlighted, invalid, className, children }: FieldCardProps) {
   return (
     <motion.div
       layout="position"
@@ -26,6 +28,7 @@ export function FieldCard({ num, label, hint, compact, highlighted, className, c
         "hover:border-line-hover focus-within:border-gold focus-within:bg-card-focus",
         compact ? "gap-1 px-[14px] py-[10px]" : "gap-[10px] px-[18px] pt-[14px] pb-4",
         highlighted && "shadow-[0_0_0_1px_#c9a24b,0_0_24px_#c9a24b44]",
+        invalid && "border-terracotta hover:border-terracotta focus-within:border-terracotta",
         className,
       )}
     >

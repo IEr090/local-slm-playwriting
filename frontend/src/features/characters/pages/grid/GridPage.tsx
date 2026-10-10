@@ -9,7 +9,7 @@ const TOAST_MS = 3000;
 
 /** Page "/cast": the cast grid "Dramatis Personae". */
 export function GridPage() {
-  const { cast, cards, updating } = useCastState();
+  const { cast, cards, saving, updating } = useCastState();
   const { newPremise, addBlank, openCharacter } = useCastActions();
   const [toast, showToast] = useTimedFlag(TOAST_MS);
 
@@ -39,6 +39,7 @@ export function GridPage() {
             character={character}
             card={cards[character.id]}
             number={i + 1}
+            saving={saving.includes(character.id)}
             updating={updating.includes(character.id)}
             onOpen={() => openCharacter(character.id)}
           />

@@ -15,6 +15,8 @@ interface FieldGridProps {
   onChange(patch: Patch): void;
   /** Fields to glow after an AI revision. */
   highlighted?: readonly (keyof Character)[];
+  /** Required fields to mark red. */
+  invalid?: readonly (keyof Character)[];
 }
 
 type TextKey = {
@@ -22,13 +24,14 @@ type TextKey = {
 }[keyof Character];
 
 /** The 16 always-editable field cards in two sections. */
-export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [] }: FieldGridProps) {
+export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [], invalid = [] }: FieldGridProps) {
   const text = (key: TextKey, num: number, label: string, rows: number, span: 2 | 4, hint?: string) => (
     <FieldCard
       num={num}
       label={label}
       hint={hint}
       highlighted={highlighted.includes(key)}
+      invalid={invalid.includes(key)}
       className={span === 4 ? "col-span-4" : "col-span-2"}
     >
       <TextField rows={rows} label={label} value={c[key]} onChange={(value) => onChange({ [key]: value })} />
@@ -41,7 +44,7 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
 
       {/* Row 1 on one line. Name · Surname fill exactly the left column (same edges as field 5);
           Age (narrow) · Gender fill the right column. */}
-      <FieldCard num={1} label="Name" compact>
+      <FieldCard num={1} label="Name" compact invalid={invalid.includes("name")}>
         <SerifInput
           aria-label="Name"
           size={8}
@@ -60,7 +63,7 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
         />
       </FieldCard>
       <div className="col-span-2 grid grid-cols-[92px_minmax(0,1fr)] gap-3">
-        <FieldCard num={3} label="Age" compact>
+        <FieldCard num={3} label="Age" compact invalid={invalid.includes("age")}>
           <SerifInput
             aria-label="Age"
             size={3}
@@ -73,7 +76,7 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
             }}
           />
         </FieldCard>
-        <FieldCard num={4} label="Gender" compact className="gap-[6px]">
+        <FieldCard num={4} label="Gender" compact invalid={invalid.includes("gender")} className="gap-[6px]">
           <div className="flex gap-[6px]" role="group" aria-label="Gender">
             {GENDERS.map((g) => (
               <Chip key={g} selected={c.gender === g} onClick={() => onChange({ gender: g })} className="px-[10px] py-[5px]">
@@ -97,6 +100,7 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
         label="Dramatic role"
         className="col-span-4"
         highlighted={highlighted.includes("dramatic_role") || highlighted.includes("dramatic_role_description")}
+        invalid={invalid.includes("dramatic_role")}
       >
         <div className="flex flex-wrap gap-[6px]" role="group" aria-label="Dramatic role">
           {DRAMATIC_ROLES.map((role) => (
@@ -108,6 +112,8 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
         <TextField
           rows={2}
           label="Dramatic role description"
+          placeholder="Describe the role in the play"
+          invalid={invalid.includes("dramatic_role_description")}
           value={c.dramatic_role_description}
           onChange={(value) => onChange({ dramatic_role_description: value })}
           className="text-ink-2"

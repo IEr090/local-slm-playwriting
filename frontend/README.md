@@ -35,7 +35,7 @@ The dev server and `npm run preview` forward `/api` to the backend, so no CORS s
 | `/` | premise prompt |
 | `/generating` | generation animation (only while generating, otherwise back to `/`) |
 | `/cast` | cast grid "Dramatis Personae" |
-| `/cast/:id` | character detail; leaving it (button, browser Back, any link) auto-saves |
+| `/cast/:id` | character detail; CREATE / SAVE saves it, leaving it any other way drops the unsaved edits |
 
 The cast is saved on the backend: after a reload it is read again.
 When hosting the build, serve `index.html` for every path (SPA fallback); `npm run dev` and

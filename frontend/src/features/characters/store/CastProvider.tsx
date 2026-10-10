@@ -106,40 +106,43 @@ export function CastProvider({ children }: { children: ReactNode }) {
     [showError],
   );
 
-  // ---------- auto-save ----------
+  // ---------- saving ----------
 
-  /**
-   * Auto-save on leaving a character: save everything edited. The backend regenerates a card only if
-   * its source fields changed; those cards show the updating overlay until the answer arrives.
-   */
-  const autoSave = useCallback(() => {
-    const { cast, cardSnapshot, updating, dirty } = stateRef.current;
+  const currentPath = useRef(location.pathname);
 
-    const edited = cast.filter((c) => dirty.includes(c.id) && !updating.includes(c.id));
-    if (!edited.length) return;
-    dispatch({ type: "saved", ids: edited.map((c) => c.id) });
+  /** Creates a new character or saves an edited one; the backend regenerates the card if needed. */
+  const saveCharacter = useCallback(
+    async (id: string) => {
+      const { cast, saved, saving } = stateRef.current;
+      const character = cast.find((c) => c.id === id);
+      if (!character || saving.includes(id)) return;
+      const previous = saved[id];
+      const regenerates = !previous || cardSourcesChanged(character, cardSources(previous));
 
-    const changed = edited.filter((c) => cardSourcesChanged(c, cardSnapshot[c.id]));
-    if (changed.length) dispatch({ type: "cardsUpdating", ids: changed.map((c) => c.id) });
-
-    edited.forEach(async (character) => {
+      dismissError();
+      dispatch({ type: "saveStarted", id, regenerates });
+      navigate(paths.cast);
       try {
-        const { card } = await api.saveCharacter(character);
-        dispatch({ type: "cardUpdated", id: character.id, card, sources: cardSources(character) });
+        const result = previous ? await api.saveCharacter(character) : await api.createCharacter(character);
+        dispatch({ type: "characterSaved", id, ...result });
       } catch (error) {
-        dispatch({ type: "cardUpdateFailed", id: character.id });
+        dispatch({ type: "saveFailed", id });
         showError(error);
+        // back to editing, unless the user has already opened something else
+        if (matchPath(paths.cast, currentPath.current)) navigate(paths.character(id));
       }
-    });
-  }, [showError]);
+    },
+    [navigate, showError, dismissError],
+  );
 
-  // Leaving /cast/:id in any way (ALL CHARACTERS, browser back, another URL) saves the edits.
-  const previousPath = useRef(location.pathname);
+  // Leaving /cast/:id in any way except CREATE / SAVE drops the unsaved edits.
   useEffect(() => {
-    const previous = previousPath.current;
-    previousPath.current = location.pathname;
-    if (previous !== location.pathname && matchPath(paths.characterPattern, previous)) autoSave();
-  }, [location.pathname, autoSave]);
+    const previous = currentPath.current;
+    currentPath.current = location.pathname;
+    if (previous === location.pathname) return;
+    const left = matchPath(paths.characterPattern, previous);
+    if (left?.params.id) dispatch({ type: "characterLeft", id: left.params.id });
+  }, [location.pathname]);
 
   // ---------- public actions ----------
 
@@ -158,8 +161,9 @@ export function CastProvider({ children }: { children: ReactNode }) {
       toggleChat: () => dispatch({ type: "toggleChat" }),
       setDraft: (draft) => dispatch({ type: "setDraft", draft }),
       sendRevision,
+      saveCharacter,
     }),
-    [startGeneration, cancelGeneration, finishGeneration, addBlank, characterOpened, sendRevision, navigate],
+    [startGeneration, cancelGeneration, finishGeneration, addBlank, characterOpened, sendRevision, saveCharacter, navigate],
   );
 
   return (
