@@ -2,8 +2,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from anton.application.llm_schemas.character_generation import GeneratedCard
-from anton.domain.models import CharacterDraft
+from anton.application.llm_schemas.character_generation import GeneratedCard, GeneratedCast, GeneratedCharacter
+from anton.domain.models import Cast, CharacterDraft
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -39,23 +39,28 @@ def make_draft() -> CharacterDraft:
     )
 
 
-class FakeSLMClient:
-    """Return a prepared response and remember every call."""
+def make_generated_cast() -> GeneratedCast:
+    """Create a model answer with one character built from the complete profile."""
+    return GeneratedCast([GeneratedCharacter(**make_draft().model_dump(exclude={"relationships"}), relationships=[])])
 
-    def __init__(self, response: BaseModel) -> None:
-        """Initialize the client with the response it always returns."""
-        self.response = response
+
+class FakeSLMClient:
+    """Return a prepared response for every response model and remember every call."""
+
+    def __init__(self, *responses: BaseModel) -> None:
+        """Initialize the client with the responses it returns, one per response model."""
+        self.responses = {type(response): response for response in responses}
         self.calls: list[dict] = []
 
     async def generate(self, system_prompt: str, user_prompt: str, response_model: type[T], think: bool) -> T:
-        """Record the call and return the prepared response."""
+        """Record the call and return the response prepared for the response model."""
         self.calls.append({
             "system_prompt": system_prompt,
             "user_prompt": user_prompt,
             "response_model": response_model,
             "think": think,
         })
-        return self.response
+        return self.responses[response_model]
 
 
 class FailingSLMClient:
@@ -68,3 +73,21 @@ class FailingSLMClient:
     async def generate(self, system_prompt: str, user_prompt: str, response_model: type[T], think: bool) -> T:
         """Raise the prepared error."""
         raise self.error
+
+
+class InMemoryCastRepository:
+    """Keep the cast in memory and count every save."""
+
+    def __init__(self, cast: Cast | None = None) -> None:
+        """Initialize the repository, optionally with an already saved cast."""
+        self.cast = cast.model_copy(deep=True) if cast is not None else None
+        self.saves = 0
+
+    def load(self) -> Cast | None:
+        """Return a copy of the saved cast, like a real storage would."""
+        return self.cast.model_copy(deep=True) if self.cast is not None else None
+
+    def save(self, cast: Cast) -> None:
+        """Keep a copy of the cast and count the save."""
+        self.cast = cast.model_copy(deep=True)
+        self.saves += 1

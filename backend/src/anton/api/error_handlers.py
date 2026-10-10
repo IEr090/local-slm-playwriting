@@ -2,11 +2,19 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from anton.api.disconnect import ClientDisconnectedError
-from anton.infrastructure.slm import SLMResponseError, SLMUnavailableError
+from anton.errors import NotFoundError, SLMResponseError, SLMUnavailableError
 
 
 def add_error_handlers(app: FastAPI) -> None:
-    """Turn model failures into responses with a message for the user and a technical detail."""
+    """Turn application errors into responses with a message for the user and a technical detail."""
+
+    @app.exception_handler(NotFoundError)
+    async def not_found(request: Request, error: NotFoundError) -> JSONResponse:
+        """Answer 404 when the requested cast or character does not exist."""
+        return JSONResponse(
+            status_code=404,
+            content={"message": "Nothing found. Generate or create characters first.", "detail": str(error)},
+        )
 
     @app.exception_handler(ClientDisconnectedError)
     async def client_disconnected(request: Request, error: ClientDisconnectedError) -> Response:

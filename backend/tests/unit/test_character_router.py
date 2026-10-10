@@ -4,9 +4,9 @@ from fastapi.testclient import TestClient
 
 from anton.api.dependencies import get_character_service
 from anton.application.character_service import CharacterService
+from anton.errors import SLMResponseError, SLMUnavailableError
 from anton.main import app
-from anton.infrastructure.slm import SLMResponseError, SLMUnavailableError
-from tests.unit.fakes import CARD, FailingSLMClient, FakeSLMClient, make_draft
+from tests.unit.fakes import CARD, FailingSLMClient, FakeSLMClient, InMemoryCastRepository, make_draft
 
 
 class CreateCharacterRouteTest(TestCase):
@@ -14,7 +14,7 @@ class CreateCharacterRouteTest(TestCase):
 
     def setUp(self) -> None:
         """Replace the character service with one that uses a fake model client."""
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(FakeSLMClient(CARD))
+        app.dependency_overrides[get_character_service] = lambda: CharacterService(FakeSLMClient(CARD), InMemoryCastRepository())
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -41,6 +41,57 @@ class CreateCharacterRouteTest(TestCase):
         self.assertNotEqual(response.json()["character"]["id"], "client-id")
 
 
+class SavedCastRouteTest(TestCase):
+    """Test the endpoints that read and edit the saved cast."""
+
+    def setUp(self) -> None:
+        """Replace the character service with one that uses a fake model client and an in-memory cast."""
+        repository = InMemoryCastRepository()
+        app.dependency_overrides[get_character_service] = lambda: CharacterService(FakeSLMClient(CARD), repository)
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        """Remove the dependency override."""
+        app.dependency_overrides.clear()
+
+    def test_get_without_cast_returns_404(self) -> None:
+        """Answer 404 before any cast is generated."""
+        response = self.client.get("/api/characters")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(set(response.json()), {"message", "detail"})
+
+    def test_get_returns_created_character(self) -> None:
+        """Return the character created before with its card."""
+        created = self.client.post("/api/characters", json=make_draft().model_dump()).json()
+
+        response = self.client.get("/api/characters")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual([character["id"] for character in body["characters"]], [created["character"]["id"]])
+        self.assertEqual(body["cards"][created["character"]["id"]]["tagline"], CARD.tagline)
+
+    def test_put_updates_character(self) -> None:
+        """Save the edited profile so that the next read returns it."""
+        character_id = self.client.post("/api/characters", json=make_draft().model_dump()).json()["character"]["id"]
+        payload = make_draft().model_dump() | {"age": 48}
+
+        response = self.client.put(f"/api/characters/{character_id}", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["character"]["age"], 48)
+        self.assertEqual(self.client.get("/api/characters").json()["characters"][0]["age"], 48)
+
+    def test_put_unknown_character_returns_404(self) -> None:
+        """Answer 404 when the character is not in the saved cast."""
+        self.client.post("/api/characters", json=make_draft().model_dump())
+
+        response = self.client.put("/api/characters/unknown", json=make_draft().model_dump())
+
+        self.assertEqual(response.status_code, 404)
+
+
 class ModelErrorRouteTest(TestCase):
     """Test how the API reports model failures."""
 
@@ -50,7 +101,7 @@ class ModelErrorRouteTest(TestCase):
 
     def generate_with(self, error: Exception):
         """Generate a cast with a model client that raises the given error."""
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(FailingSLMClient(error))
+        app.dependency_overrides[get_character_service] = lambda: CharacterService(FailingSLMClient(error), InMemoryCastRepository())
         return TestClient(app).post("/api/characters/generate", json={"premise": "A theatre in Vienna."})
 
     def test_unreachable_model_returns_503(self) -> None:

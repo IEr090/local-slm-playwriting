@@ -48,9 +48,13 @@ uv run python -m unittest discover -s tests/integration -t .  # needs Ollama; th
   - `api/`: HTTP layer (routers, DTOs, mappers, exception handlers).
   - `application/`: Business logic services.
   - `domain/`: Domain models, independent of FastAPI and Ollama.
-  - `infrastructure/`: External integrations (config, SLM clients, prompts).
+  - `infrastructure/`: External integrations (config, SLM clients, prompts, storage).
 - `backend/tests/`: Unit and integration tests.
 - `frontend/`: React frontend.
+
+## Storage
+
+The cast is saved to `backend/data/cast.json` after every generation, creation and edit, so it survives a backend restart. A new generation replaces the saved cast. Set `ANTON_DATA_DIR` to store the data in another folder.
 
 ## Status
 

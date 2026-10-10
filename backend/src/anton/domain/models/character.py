@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 
 
 Gender = Literal["female", "male", "other"]
@@ -43,10 +43,6 @@ class Character(CharacterDraft):
     """Represent a generated character."""
 
     id: str
-
-
-class Characters(RootModel[list[Character]]):
-    """Represent a collection of generated characters."""
 
 
 class CharacterCard(BaseModel):

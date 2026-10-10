@@ -3,16 +3,29 @@ from unittest import IsolatedAsyncioTestCase
 from uuid import UUID
 
 from anton.application.character_service import CARD_SOURCE_FIELDS, CharacterService
-from tests.unit.fakes import CARD, FakeSLMClient, make_draft
+from anton.errors import CastNotFoundError, CharacterNotFoundError
+from anton.domain.models import Cast, Character, CharacterCard
+from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, make_draft, make_generated_cast
+
+
+OLD_CARD = CharacterCard(role_label="protagonist", tagline="Old tagline", traits=["A", "B", "C"], wants="Old.", fears="Old.")
+
+
+def make_cast() -> Cast:
+    """Create a saved cast of two characters with old cards."""
+    first = Character(id="first", **make_draft().model_dump())
+    second = Character(id="second", **(make_draft().model_dump() | {"name": "Mark", "age": 31}))
+    return Cast(characters=[first, second], cards={"first": OLD_CARD, "second": OLD_CARD})
 
 
 class CreateCharacterTest(IsolatedAsyncioTestCase):
     """Test creating a single character with its card."""
 
     async def asyncSetUp(self) -> None:
-        """Create the service with a fake model client."""
+        """Create the service with a fake model client and an empty repository."""
         self.client = FakeSLMClient(CARD)
-        self.service = CharacterService(self.client)
+        self.repository = InMemoryCastRepository()
+        self.service = CharacterService(self.client, self.repository)
         self.draft = make_draft()
 
     async def test_gives_new_character_an_id(self) -> None:
@@ -35,3 +48,83 @@ class CreateCharacterTest(IsolatedAsyncioTestCase):
 
         prompt = json.loads(self.client.calls[0]["user_prompt"])
         self.assertEqual(set(prompt), CARD_SOURCE_FIELDS)
+
+    async def test_adds_character_to_saved_cast(self) -> None:
+        """Save the new character and its card in the cast."""
+        result = await self.service.create_character(self.draft)
+
+        cast = self.repository.load()
+        self.assertEqual(cast.characters, [result.character])
+        self.assertEqual(cast.cards, {result.character.id: result.card})
+
+
+class GenerateCastTest(IsolatedAsyncioTestCase):
+    """Test generating and saving the whole cast."""
+
+    async def test_saves_generated_cast(self) -> None:
+        """Save the generated cast in the repository."""
+        repository = InMemoryCastRepository()
+        service = CharacterService(FakeSLMClient(make_generated_cast(), CARD), repository)
+
+        cast = await service.generate_cast("A theatre in Vienna.")
+
+        self.assertEqual(repository.load(), cast)
+        self.assertEqual(repository.saves, 1)
+
+
+class GetCastTest(IsolatedAsyncioTestCase):
+    """Test reading the saved cast."""
+
+    async def test_raises_without_saved_cast(self) -> None:
+        """Report that no cast has been generated yet."""
+        service = CharacterService(FakeSLMClient(CARD), InMemoryCastRepository())
+
+        with self.assertRaises(CastNotFoundError):
+            service.get_cast()
+
+
+class EditCharacterTest(IsolatedAsyncioTestCase):
+    """Test editing a character of the saved cast."""
+
+    async def asyncSetUp(self) -> None:
+        """Create the service with a fake model client and a saved cast of two characters."""
+        self.client = FakeSLMClient(CARD)
+        self.repository = InMemoryCastRepository(make_cast())
+        self.service = CharacterService(self.client, self.repository)
+
+    async def test_replaces_only_edited_character(self) -> None:
+        """Keep the id, the order and the other character unchanged."""
+        draft = make_draft().model_copy(update={"age": 48})
+
+        await self.service.edit_character("first", draft)
+
+        cast = self.repository.load()
+        self.assertEqual([character.id for character in cast.characters], ["first", "second"])
+        self.assertEqual(cast.characters[0].age, 48)
+        self.assertEqual(cast.characters[1], make_cast().characters[1])
+
+    async def test_keeps_card_when_card_sources_unchanged(self) -> None:
+        """Skip the model when only fields outside the card sources changed."""
+        draft = make_draft().model_copy(update={"age": 48})
+
+        result = await self.service.edit_character("first", draft)
+
+        self.assertEqual(self.client.calls, [])
+        self.assertEqual(result.card, OLD_CARD)
+
+    async def test_regenerates_card_when_card_sources_changed(self) -> None:
+        """Generate and save a new card once when a card source field changed."""
+        draft = make_draft().model_copy(update={"goal": "Sell the theatre."})
+
+        result = await self.service.edit_character("first", draft)
+
+        self.assertEqual(len(self.client.calls), 1)
+        self.assertEqual(result.card.tagline, CARD.tagline)
+        self.assertEqual(self.repository.load().cards["first"], result.card)
+
+    async def test_raises_for_unknown_character(self) -> None:
+        """Report a character id that is not in the saved cast."""
+        draft = make_draft()
+
+        with self.assertRaises(CharacterNotFoundError):
+            await self.service.edit_character("unknown", draft)

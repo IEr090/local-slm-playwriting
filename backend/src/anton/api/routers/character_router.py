@@ -21,9 +21,9 @@ async def generate_cast(
 
 
 @router.get("")
-async def get_cast() -> Cast:
+async def get_cast(service: CharacterServiceDep) -> Cast:
     """Return the saved cast with cards."""
-    raise NotImplementedError
+    return service.get_cast()
 
 
 @router.post("")
@@ -33,9 +33,9 @@ async def create_character(draft: CharacterDraft, service: CharacterServiceDep) 
 
 
 @router.put("/{character_id}")
-async def edit_character(character_id: str) -> None:
-    """Update the character and regenerate its card."""
-    raise NotImplementedError
+async def edit_character(character_id: str, draft: CharacterDraft, service: CharacterServiceDep) -> CharacterWithCard:
+    """Update the character; regenerate its card only if the fields it is built from changed."""
+    return await service.edit_character(character_id, draft)
 
 
 @router.post("/{character_id}/revise")
