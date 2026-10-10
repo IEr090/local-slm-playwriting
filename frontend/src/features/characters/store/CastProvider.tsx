@@ -11,8 +11,6 @@ import { useErrors } from "@/shared/errors/errors-context";
 import { ActionsContext, StateContext, type CastActions } from "./cast-context";
 import { initialState, reducer } from "./cast-reducer";
 
-/** Several changed characters update one after another. */
-const CARD_UPDATE_STAGGER_MS = 700;
 /** How long changed fields glow after an AI revision. */
 const HIGHLIGHT_MS = 2400;
 
@@ -29,8 +27,11 @@ export function CastProvider({ children }: { children: ReactNode }) {
 
   // On page load: read the saved cast, so /cast and /cast/:id work after a reload.
   useEffect(() => {
-    void api.getCast().then(({ characters, cards }) => dispatch({ type: "castLoaded", characters, cards }));
-  }, []);
+    api
+      .getCast()
+      .then(({ characters, cards }) => dispatch({ type: "castLoaded", characters, cards }))
+      .catch(showError);
+  }, [showError]);
 
   // ---------- generation ----------
 
@@ -108,31 +109,27 @@ export function CastProvider({ children }: { children: ReactNode }) {
   // ---------- auto-save ----------
 
   /**
-   * Auto-save on leaving a character: save everything edited, then regenerate only the cards
-   * whose source fields changed, one after another, each showing the updating overlay.
+   * Auto-save on leaving a character: save everything edited. The backend regenerates a card only if
+   * its source fields changed; those cards show the updating overlay until the answer arrives.
    */
   const autoSave = useCallback(() => {
-    const { cast, cards, cardSnapshot, updating, dirty } = stateRef.current;
+    const { cast, cardSnapshot, updating, dirty } = stateRef.current;
 
-    const edited = cast.filter((c) => dirty.includes(c.id));
-    if (edited.length) {
-      dispatch({ type: "saved", ids: edited.map((c) => c.id) });
-      edited.forEach((c) => void api.saveCharacter(c));
-    }
+    const edited = cast.filter((c) => dirty.includes(c.id) && !updating.includes(c.id));
+    if (!edited.length) return;
+    dispatch({ type: "saved", ids: edited.map((c) => c.id) });
 
-    const changed = cast.filter((c) => !updating.includes(c.id) && cardSourcesChanged(c, cardSnapshot[c.id]));
-    if (!changed.length) return;
-    dispatch({ type: "cardsUpdating", ids: changed.map((c) => c.id) });
-    changed.forEach((character, i) => {
-      setTimeout(async () => {
-        try {
-          const card = await api.generateCard(character, cards[character.id]);
-          dispatch({ type: "cardUpdated", id: character.id, card, sources: cardSources(character) });
-        } catch (error) {
-          dispatch({ type: "cardUpdateFailed", id: character.id });
-          showError(error);
-        }
-      }, i * CARD_UPDATE_STAGGER_MS);
+    const changed = edited.filter((c) => cardSourcesChanged(c, cardSnapshot[c.id]));
+    if (changed.length) dispatch({ type: "cardsUpdating", ids: changed.map((c) => c.id) });
+
+    edited.forEach(async (character) => {
+      try {
+        const { card } = await api.saveCharacter(character);
+        dispatch({ type: "cardUpdated", id: character.id, card, sources: cardSources(character) });
+      } catch (error) {
+        dispatch({ type: "cardUpdateFailed", id: character.id });
+        showError(error);
+      }
     });
   }, [showError]);
 
