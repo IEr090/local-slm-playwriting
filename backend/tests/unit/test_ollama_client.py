@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock
 from ollama import ResponseError
 
 from anton.application.llm_schemas.character_generation import GeneratedCard
-from anton.infrastructure.slm import OllamaClient, SLMResponseError, SLMUnavailableError
+from anton.errors import SLMResponseError, SLMUnavailableError
+from anton.infrastructure.slm import OllamaClient
 from tests.unit.fakes import CARD
 
 

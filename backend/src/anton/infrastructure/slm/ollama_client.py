@@ -4,7 +4,7 @@ from ollama import AsyncClient, ResponseError
 from pydantic import BaseModel, ValidationError
 
 from .client import SLMClient
-from .errors import SLMResponseError, SLMUnavailableError
+from anton.errors import SLMResponseError, SLMUnavailableError
 
 
 T = TypeVar("T", bound=BaseModel)

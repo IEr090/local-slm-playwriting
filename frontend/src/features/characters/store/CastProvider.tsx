@@ -11,8 +11,6 @@ import { useErrors } from "@/shared/errors/errors-context";
 import { ActionsContext, StateContext, type CastActions } from "./cast-context";
 import { initialState, reducer } from "./cast-reducer";
 
-/** Several changed characters update one after another. */
-const CARD_UPDATE_STAGGER_MS = 700;
 /** How long changed fields glow after an AI revision. */
 const HIGHLIGHT_MS = 2400;
 
@@ -29,8 +27,11 @@ export function CastProvider({ children }: { children: ReactNode }) {
 
   // On page load: read the saved cast, so /cast and /cast/:id work after a reload.
   useEffect(() => {
-    void api.getCast().then(({ characters, cards }) => dispatch({ type: "castLoaded", characters, cards }));
-  }, []);
+    api
+      .getCast()
+      .then(({ characters, cards }) => dispatch({ type: "castLoaded", characters, cards }))
+      .catch(showError);
+  }, [showError]);
 
   // ---------- generation ----------
 
@@ -105,44 +106,43 @@ export function CastProvider({ children }: { children: ReactNode }) {
     [showError],
   );
 
-  // ---------- auto-save ----------
+  // ---------- saving ----------
 
-  /**
-   * Auto-save on leaving a character: save everything edited, then regenerate only the cards
-   * whose source fields changed, one after another, each showing the updating overlay.
-   */
-  const autoSave = useCallback(() => {
-    const { cast, cards, cardSnapshot, updating, dirty } = stateRef.current;
+  const currentPath = useRef(location.pathname);
 
-    const edited = cast.filter((c) => dirty.includes(c.id));
-    if (edited.length) {
-      dispatch({ type: "saved", ids: edited.map((c) => c.id) });
-      edited.forEach((c) => void api.saveCharacter(c));
-    }
+  /** Creates a new character or saves an edited one; the backend regenerates the card if needed. */
+  const saveCharacter = useCallback(
+    async (id: string) => {
+      const { cast, saved, saving } = stateRef.current;
+      const character = cast.find((c) => c.id === id);
+      if (!character || saving.includes(id)) return;
+      const previous = saved[id];
+      const regenerates = !previous || cardSourcesChanged(character, cardSources(previous));
 
-    const changed = cast.filter((c) => !updating.includes(c.id) && cardSourcesChanged(c, cardSnapshot[c.id]));
-    if (!changed.length) return;
-    dispatch({ type: "cardsUpdating", ids: changed.map((c) => c.id) });
-    changed.forEach((character, i) => {
-      setTimeout(async () => {
-        try {
-          const card = await api.generateCard(character, cards[character.id]);
-          dispatch({ type: "cardUpdated", id: character.id, card, sources: cardSources(character) });
-        } catch (error) {
-          dispatch({ type: "cardUpdateFailed", id: character.id });
-          showError(error);
-        }
-      }, i * CARD_UPDATE_STAGGER_MS);
-    });
-  }, [showError]);
+      dismissError();
+      dispatch({ type: "saveStarted", id, regenerates });
+      navigate(paths.cast);
+      try {
+        const result = previous ? await api.saveCharacter(character) : await api.createCharacter(character);
+        dispatch({ type: "characterSaved", id, ...result });
+      } catch (error) {
+        dispatch({ type: "saveFailed", id });
+        showError(error);
+        // back to editing, unless the user has already opened something else
+        if (matchPath(paths.cast, currentPath.current)) navigate(paths.character(id));
+      }
+    },
+    [navigate, showError, dismissError],
+  );
 
-  // Leaving /cast/:id in any way (ALL CHARACTERS, browser back, another URL) saves the edits.
-  const previousPath = useRef(location.pathname);
+  // Leaving /cast/:id in any way except CREATE / SAVE drops the unsaved edits.
   useEffect(() => {
-    const previous = previousPath.current;
-    previousPath.current = location.pathname;
-    if (previous !== location.pathname && matchPath(paths.characterPattern, previous)) autoSave();
-  }, [location.pathname, autoSave]);
+    const previous = currentPath.current;
+    currentPath.current = location.pathname;
+    if (previous === location.pathname) return;
+    const left = matchPath(paths.characterPattern, previous);
+    if (left?.params.id) dispatch({ type: "characterLeft", id: left.params.id });
+  }, [location.pathname]);
 
   // ---------- public actions ----------
 
@@ -161,8 +161,9 @@ export function CastProvider({ children }: { children: ReactNode }) {
       toggleChat: () => dispatch({ type: "toggleChat" }),
       setDraft: (draft) => dispatch({ type: "setDraft", draft }),
       sendRevision,
+      saveCharacter,
     }),
-    [startGeneration, cancelGeneration, finishGeneration, addBlank, characterOpened, sendRevision, navigate],
+    [startGeneration, cancelGeneration, finishGeneration, addBlank, characterOpened, sendRevision, saveCharacter, navigate],
   );
 
   return (

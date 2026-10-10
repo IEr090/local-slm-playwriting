@@ -2,7 +2,6 @@
 // Which page is shown is decided by the router (URL), not by this state.
 
 import { DEFAULT_PREMISE } from "@/features/characters/api/mock-data";
-import { cardSources, type CardSources } from "@/features/characters/model/card-sources";
 import type { Character, CharacterCard, ChatMessage, RevisionResult } from "@/features/characters/model/types";
 
 /** idle → running (waiting for the api) → ready (api answered, animation plays the names) → idle. */
@@ -23,12 +22,12 @@ export interface CastState {
   aiTypingFor: string | null;
   /** Fields that glow for a moment after an AI revision. */
   highlight: { id: string; fields: (keyof Character)[] } | null;
-  /** Ids of characters whose card is being regenerated. */
+  /** The versions saved on the backend; `cast` holds the edited ones. A new character is not here yet. */
+  saved: Record<string, Character>;
+  /** Ids of characters being saved (CREATE / SAVE); they cannot be opened meanwhile. */
+  saving: string[];
+  /** Ids of saving characters whose card is being regenerated (updating overlay). */
   updating: string[];
-  /** Card source fields as they were when each card was last generated. */
-  cardSnapshot: Record<string, CardSources>;
-  /** Ids of characters edited since the last auto-save. */
-  dirty: string[];
 }
 
 export const initialState: CastState = {
@@ -42,9 +41,9 @@ export const initialState: CastState = {
   draft: "",
   aiTypingFor: null,
   highlight: null,
+  saved: {},
+  saving: [],
   updating: [],
-  cardSnapshot: {},
-  dirty: [],
 };
 
 export type Action =
@@ -62,12 +61,12 @@ export type Action =
   | { type: "revisionAnswered"; id: string; result: RevisionResult }
   | { type: "revisionFailed"; id: string }
   | { type: "clearHighlight" }
-  | { type: "cardsUpdating"; ids: string[] }
-  | { type: "cardUpdated"; id: string; card: CharacterCard; sources: CardSources }
-  | { type: "cardUpdateFailed"; id: string }
-  | { type: "saved"; ids: string[] };
+  | { type: "saveStarted"; id: string; regenerates: boolean }
+  | { type: "characterSaved"; id: string; character: Character; card: CharacterCard }
+  | { type: "saveFailed"; id: string }
+  | { type: "characterLeft"; id: string };
 
-/** A fresh cast (generated or loaded): new cards, snapshots, no chats. */
+/** A fresh cast (generated or loaded): new cards, everything saved, no chats. */
 function withCast(state: CastState, characters: Character[], cards: Record<string, CharacterCard>): CastState {
   return {
     ...state,
@@ -75,9 +74,9 @@ function withCast(state: CastState, characters: Character[], cards: Record<strin
     cast: characters,
     cards,
     chats: {},
+    saved: Object.fromEntries(characters.map((c) => [c.id, c])),
+    saving: [],
     updating: [],
-    cardSnapshot: Object.fromEntries(characters.map((c) => [c.id, cardSources(c)])),
-    dirty: [],
   };
 }
 
@@ -99,7 +98,6 @@ export function reducer(state: CastState, action: Action): CastState {
         loaded: true,
         cast: [...state.cast, action.character],
         cards: { ...state.cards, [action.character.id]: action.card },
-        cardSnapshot: { ...state.cardSnapshot, [action.character.id]: cardSources(action.character) },
       };
     case "characterOpened":
       return { ...state, draft: "", chatOpen: false };
@@ -107,7 +105,6 @@ export function reducer(state: CastState, action: Action): CastState {
       return {
         ...state,
         cast: state.cast.map((c) => (c.id === action.id ? { ...c, ...action.patch } : c)),
-        dirty: markDirty(state.dirty, action.id),
       };
     case "toggleChat":
       return { ...state, chatOpen: !state.chatOpen };
@@ -127,7 +124,6 @@ export function reducer(state: CastState, action: Action): CastState {
         ...state,
         aiTypingFor: null,
         cast: state.cast.map((c) => (c.id === action.id ? { ...c, ...patch, id: c.id } : c)),
-        dirty: markDirty(state.dirty, action.id),
         chats: {
           ...state.chats,
           [action.id]: [
@@ -142,22 +138,46 @@ export function reducer(state: CastState, action: Action): CastState {
       return { ...state, aiTypingFor: state.aiTypingFor === action.id ? null : state.aiTypingFor };
     case "clearHighlight":
       return { ...state, highlight: null };
-    case "cardsUpdating":
-      return { ...state, updating: [...new Set([...state.updating, ...action.ids])] };
-    case "cardUpdated":
-      if (!state.cast.some((c) => c.id === action.id)) return { ...state, updating: without(state.updating, action.id) };
+    case "saveStarted":
       return {
         ...state,
-        cards: { ...state.cards, [action.id]: action.card },
-        cardSnapshot: { ...state.cardSnapshot, [action.id]: action.sources },
-        updating: without(state.updating, action.id),
+        saving: [...state.saving, action.id],
+        updating: action.regenerates ? [...state.updating, action.id] : state.updating,
       };
-    case "cardUpdateFailed":
-      return { ...state, updating: without(state.updating, action.id) };
-    case "saved":
-      return { ...state, dirty: state.dirty.filter((id) => !action.ids.includes(id)) };
+    case "characterSaved": {
+      // a new character gets its id from the backend
+      const { id, character, card } = action;
+      const done = { ...state, saving: without(state.saving, id), updating: without(state.updating, id) };
+      if (!state.cast.some((c) => c.id === id)) return done;
+      const chat = state.chats[id];
+      return {
+        ...done,
+        cast: state.cast.map((c) => (c.id === id ? character : c)),
+        cards: { ...omit(state.cards, id), [character.id]: card },
+        saved: { ...state.saved, [character.id]: character },
+        chats: chat ? { ...omit(state.chats, id), [character.id]: chat } : state.chats,
+      };
+    }
+    case "saveFailed":
+      return { ...state, saving: without(state.saving, action.id), updating: without(state.updating, action.id) };
+    case "characterLeft": {
+      // leaving without saving: an edited character goes back to its saved version, a new one is dropped
+      if (state.saving.includes(action.id)) return state;
+      const saved = state.saved[action.id];
+      if (saved) return { ...state, cast: state.cast.map((c) => (c.id === action.id ? saved : c)) };
+      return {
+        ...state,
+        cast: state.cast.filter((c) => c.id !== action.id),
+        cards: omit(state.cards, action.id),
+        chats: omit(state.chats, action.id),
+      };
+    }
   }
 }
 
 const without = (ids: string[], id: string) => ids.filter((x) => x !== id);
-const markDirty = (ids: string[], id: string) => (ids.includes(id) ? ids : [...ids, id]);
+
+function omit<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const { [key]: _removed, ...rest } = record;
+  return rest;
+}

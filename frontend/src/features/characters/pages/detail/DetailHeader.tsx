@@ -9,12 +9,26 @@ interface DetailHeaderProps {
   index: number;
   total: number;
   chatOpen: boolean;
+  /** "CREATE" for a new character, "SAVE" for an existing one. */
+  saveLabel: string;
+  saveDisabled: boolean;
   onAll(): void;
+  onSave(): void;
   onToggleChat(): void;
 }
 
 /** Fixed header; name and line update live while typing. */
-export function DetailHeader({ character, index, total, chatOpen, onAll, onToggleChat }: DetailHeaderProps) {
+export function DetailHeader({
+  character,
+  index,
+  total,
+  chatOpen,
+  saveLabel,
+  saveDisabled,
+  onAll,
+  onSave,
+  onToggleChat,
+}: DetailHeaderProps) {
   const chatLabel = chatOpen ? "Hide AI chat" : "Show AI chat";
   return (
     <div className="relative flex items-end justify-between border-b border-dotted border-line-strong px-12 pt-[34px] pb-[18px]">
@@ -41,6 +55,14 @@ export function DetailHeader({ character, index, total, chatOpen, onAll, onToggl
         >
           <ArrowLeft className="block shrink-0" />
           <span>ALL CHARACTERS</span>
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saveDisabled}
+          className="box-border inline-flex h-10 items-center justify-center rounded-full border border-gold bg-transparent px-5 font-sans text-[11px] leading-none tracking-[2px] whitespace-nowrap text-gold transition-[background-color,opacity] duration-150 hover:bg-gold/[0.133] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent"
+        >
+          {saveLabel}
         </button>
         <RoundIconButton active={chatOpen} onClick={onToggleChat} aria-label={chatLabel} title={chatLabel}>
           <Spark />

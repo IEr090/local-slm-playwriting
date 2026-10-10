@@ -50,6 +50,8 @@ export function RelationshipsField({ selfId, relationships, cast, cards, onChang
             <TextField
               rows={1}
               label="Relationship"
+              placeholder="Describe the relationship"
+              lined
               value={rel.description}
               onChange={(description) => setRow(i, { description })}
               className="flex-1 pt-[3px]"

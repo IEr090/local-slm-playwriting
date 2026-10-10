@@ -1,15 +1,14 @@
 // The only data source of the frontend.
-// generateCast calls the backend. Everything else is still mocked: fake delays instead of generation,
-// text shortening instead of card generation, and nothing is saved anywhere.
-// UI components never create characters or cards themselves, they call these functions.
+// Everything except the AI revision calls the backend. A blank character only exists on the frontend
+// until it is created. UI components never create characters or cards themselves, they call these functions.
 
 import type {
   Character,
   CharacterCard,
   RevisionResult,
 } from "@/features/characters/model/types";
-import { postJson } from "@/shared/api/http";
-import { delay, failIfConfigured, mockCard } from "./mock-helpers";
+import { getJson, postJson, putJson } from "@/shared/api/http";
+import { delay, failIfConfigured } from "./mock-helpers";
 
 export { ApiError } from "@/shared/api/errors";
 export { configureMock } from "./mock-helpers";
@@ -21,6 +20,11 @@ interface CallOptions {
 export interface GeneratedCast {
   characters: Character[];
   cards: Record<string, CharacterCard>;
+}
+
+export interface CharacterWithCard {
+  character: Character;
+  card: CharacterCard;
 }
 
 const newId = () => crypto.randomUUID();
@@ -38,12 +42,12 @@ async function generateCast(premise: string, { signal }: CallOptions = {}): Prom
   return postJson<GeneratedCast>("/api/characters/generate", { premise }, { signal });
 }
 
-/** Creates an empty character ("New Character") with its placeholder card. */
-async function createBlankCharacter(): Promise<{ character: Character; card: CharacterCard }> {
+/** An empty character with its placeholder card, only on the frontend until `createCharacter`. */
+async function createBlankCharacter(): Promise<CharacterWithCard> {
   const character: Character = {
     id: newId(),
-    name: "New",
-    surname: "Character",
+    name: "",
+    surname: "",
     age: null,
     gender: null,
     nationality_background: "",
@@ -61,17 +65,6 @@ async function createBlankCharacter(): Promise<{ character: Character; card: Cha
     relationships: [],
   };
   return { character, card: structuredClone(BLANK_CARD) };
-}
-
-/** Regenerates the grid card from the profile. `previous` fills in anything the profile lacks. */
-async function generateCard(
-  character: Character,
-  previous: CharacterCard = BLANK_CARD,
-  { signal }: CallOptions = {},
-): Promise<CharacterCard> {
-  await delay(2600, signal);
-  failIfConfigured("card");
-  return mockCard(character, previous);
 }
 
 /** Chat "Ask AI to revise": the mock appends the request to Personality. */
@@ -97,22 +90,32 @@ async function reviseCharacter(
   };
 }
 
-/** Auto-save target. Nothing is saved yet: the backend has no storage. */
-async function saveCharacter(character: Character): Promise<void> {
-  void character;
-  await delay(150);
+/** Creates the character on the backend; it gets a new id and a generated card. */
+async function createCharacter(character: Character): Promise<CharacterWithCard> {
+  const { id, ...draft } = character;
+  void id;
+  return postJson<CharacterWithCard>("/api/characters", draft);
 }
 
-/** The saved cast (e.g. after a page reload). Always empty: the backend has no storage yet. */
+/**
+ * Saves the edited character. The backend regenerates its card only if the card source fields changed,
+ * so the answer may take as long as a card generation.
+ */
+async function saveCharacter(character: Character): Promise<CharacterWithCard> {
+  const { id, ...draft } = character;
+  return putJson<CharacterWithCard>(`/api/characters/${encodeURIComponent(id)}`, draft);
+}
+
+/** The saved cast (e.g. after a page reload). */
 async function getCast(): Promise<GeneratedCast> {
-  return { characters: [], cards: {} };
+  return getJson<GeneratedCast>("/api/characters");
 }
 
 export const api = {
   getCast,
   generateCast,
   createBlankCharacter,
-  generateCard,
+  createCharacter,
   reviseCharacter,
   saveCharacter,
 };

@@ -7,14 +7,28 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/** Reads the JSON answer of `url`. */
+export function getJson<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  return requestJson<T>("GET", url, undefined, options);
+}
+
 /** Sends `body` as JSON and returns the parsed JSON answer. */
-export async function postJson<T>(url: string, body: unknown, { signal }: RequestOptions = {}): Promise<T> {
+export function postJson<T>(url: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+  return requestJson<T>("POST", url, body, options);
+}
+
+/** Replaces the resource at `url` with `body` and returns the parsed JSON answer. */
+export function putJson<T>(url: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+  return requestJson<T>("PUT", url, body, options);
+}
+
+async function requestJson<T>(method: string, url: string, body: unknown, { signal }: RequestOptions): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal,
     });
   } catch (error) {

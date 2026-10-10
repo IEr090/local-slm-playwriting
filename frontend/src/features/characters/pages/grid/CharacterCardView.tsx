@@ -8,23 +8,25 @@ interface CharacterCardViewProps {
   character: Character;
   card: CharacterCard;
   number: number;
+  /** The character is being saved; it cannot be opened meanwhile. */
+  saving?: boolean;
   /** The card is being regenerated after an edit. */
   updating?: boolean;
   onOpen(): void;
 }
 
 /** One card of the cast grid. The name comes live from the profile; everything else from the card. */
-export function CharacterCardView({ character, card, number, updating = false, onOpen }: CharacterCardViewProps) {
+export function CharacterCardView({ character, card, number, saving = false, updating = false, onOpen }: CharacterCardViewProps) {
   return (
     <motion.button
       type="button"
-      // not clickable while the card is being updated
-      disabled={updating}
-      aria-busy={updating}
+      // not clickable while the character is being saved
+      disabled={saving}
+      aria-busy={saving}
       onClick={onOpen}
-      whileHover={updating ? undefined : { y: -2 }}
+      whileHover={saving ? undefined : { y: -2 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
-      className={`relative box-border flex h-[244px] flex-col rounded-[10px] border border-line bg-card px-6 py-5 text-left text-ink transition-colors duration-150 ${updating ? "cursor-default" : "hover:border-gold"}`}
+      className={`relative box-border flex h-[244px] flex-col rounded-[10px] border border-line bg-card px-6 py-5 text-left text-ink transition-colors duration-150 ${saving ? "cursor-default" : "hover:border-gold"}`}
     >
       <span className="flex w-full items-center justify-between">
         <span className="font-sans text-[10px] tracking-[2.5px] text-gold">{roleLabel(card.role_label).toUpperCase()}</span>

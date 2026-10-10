@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, BLANK_CARD, configureMock } from "@/features/characters/api";
-import { clause, mockCard, traitsFrom } from "@/features/characters/api/mock-helpers";
+import { api, ApiError, configureMock } from "@/features/characters/api";
 import { SEED_CAST } from "@/features/characters/api/mock-data";
 import type { Character } from "@/features/characters/model/types";
 
@@ -13,27 +12,6 @@ afterEach(() => {
 /** The seed characters with ids; relationships are left out. */
 const seedCast = (): Character[] =>
   SEED_CAST.map((seed, i) => ({ ...structuredClone(seed.profile), id: `id-${i}`, relationships: [] }));
-
-describe("clause", () => {
-  it("takes the first clause, cuts to n words and capitalises", () => {
-    expect(clause("former actor, now owner", 6)).toBe("Former actor");
-    expect(clause("one two three four five six seven eight", 6)).toBe("One two three four five six…");
-    expect(clause("", 6)).toBe("");
-  });
-});
-
-describe("traitsFrom", () => {
-  it("takes the last word of each part of the first sentence", () => {
-    expect(traitsFrom("Composed, sharp-tongued and quietly controlling. Meets every crisis.")).toEqual([
-      "Composed",
-      "Sharp-tongued",
-      "Controlling",
-    ]);
-  });
-  it("returns max 3 traits", () => {
-    expect(traitsFrom("a, b, c, d")).toHaveLength(3);
-  });
-});
 
 describe("generateCast", () => {
   it("posts the premise to the backend and returns its answer", async () => {
@@ -59,11 +37,11 @@ describe("generateCast", () => {
 });
 
 describe("createBlankCharacter", () => {
-  it("creates an empty 'New Character' with the placeholder card", async () => {
+  it("creates an empty character with the placeholder card", async () => {
     const { character, card } = await api.createBlankCharacter();
     expect(character).toMatchObject({
-      name: "New",
-      surname: "Character",
+      name: "",
+      surname: "",
       age: null,
       gender: null,
       dramatic_role: null,
@@ -75,37 +53,6 @@ describe("createBlankCharacter", () => {
       traits: ["Undefined"],
       wants: "Not written yet",
       fears: "Not written yet",
-    });
-  });
-});
-
-describe("generateCard", () => {
-  it("builds the card from the card source fields", async () => {
-    const mark = seedCast()[1];
-    const card = await api.generateCard(mark, SEED_CAST[1].card);
-    expect(card).toEqual({
-      role_label: "antagonist",
-      tagline: "Former actor",
-      traits: ["Charming", "Restless", "Practical"],
-      wants: "Attend the funeral",
-      fears: "He sold out and that everyone in…",
-    });
-  });
-
-  it("keeps the previous values where the profile is empty", async () => {
-    const { character } = await api.createBlankCharacter();
-    const card = await api.generateCard({ ...character, dramatic_role: "mentor" }, BLANK_CARD);
-    expect(card).toEqual({ ...BLANK_CARD, role_label: "mentor" });
-  });
-
-  it("matches mockCard", () => {
-    const c = { personality: "Warm and loud.", occupation_social_role: "Baker", goal: "", fear_weakness: "Fears that nobody comes.", dramatic_role: "foil" } as Character;
-    expect(mockCard(c, BLANK_CARD)).toEqual({
-      role_label: "foil",
-      tagline: "Baker",
-      traits: ["Warm", "Loud"],
-      wants: "Not written yet",
-      fears: "Nobody comes",
     });
   });
 });
@@ -131,7 +78,6 @@ describe("reviseCharacter", () => {
 
 describe("?fail=…", () => {
   it.each([
-    ["card", () => api.generateCard({} as Character), "Could not update the character card. Is Ollama running?"],
     ["chat", () => api.reviseCharacter({ personality: "" } as Character, "x"), "The AI could not revise this character. Is Ollama running?"],
   ] as const)("%s rejects with an ApiError", async (call, run, message) => {
     configureMock({ fail: new Set([call]) });
@@ -142,8 +88,46 @@ describe("?fail=…", () => {
   });
 });
 
+describe("createCharacter", () => {
+  it("posts the profile without the temporary id and returns the character with its new id and card", async () => {
+    const elena = seedCast()[0];
+    const answer = { character: { ...elena, id: "backend-id" }, card: SEED_CAST[0].card };
+    const fetch = vi.fn().mockResolvedValue(Response.json(answer));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(api.createCharacter(elena)).resolves.toEqual(answer);
+    const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/api/characters");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).not.toHaveProperty("id");
+  });
+});
+
+describe("saveCharacter", () => {
+  it("puts the profile without the id to the backend and returns the character with its card", async () => {
+    const elena = seedCast()[0];
+    const answer = { character: elena, card: SEED_CAST[0].card };
+    const fetch = vi.fn().mockResolvedValue(Response.json(answer));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(api.saveCharacter(elena)).resolves.toEqual(answer);
+    const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/api/characters/id-0");
+    expect(init.method).toBe("PUT");
+    const { id, ...draft } = elena;
+    void id;
+    expect(JSON.parse(init.body)).toEqual(draft);
+  });
+});
+
 describe("getCast", () => {
-  it("returns an empty cast: nothing is saved yet", async () => {
-    await expect(api.getCast()).resolves.toEqual({ characters: [], cards: {} });
+  it("reads the saved cast from the backend", async () => {
+    const answer = { characters: seedCast(), cards: { "id-0": SEED_CAST[0].card } };
+    const fetch = vi.fn().mockResolvedValue(Response.json(answer));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(api.getCast()).resolves.toEqual(answer);
+    expect(fetch.mock.calls[0][0]).toBe("/api/characters");
+    expect(fetch.mock.calls[0][1].method).toBe("GET");
   });
 });

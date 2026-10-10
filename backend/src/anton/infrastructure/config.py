@@ -1,4 +1,10 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# config.py -> infrastructure -> anton -> src -> backend; keeps data in backend/ whatever the working directory.
+BACKEND_DIR = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -9,3 +15,4 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3:4b"
     ollama_num_ctx: int = 16384
     thinking: bool = True
+    data_dir: Path = BACKEND_DIR / "data"
