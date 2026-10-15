@@ -1,9 +1,21 @@
 import json
+from typing import Annotated, TypedDict
+
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
 
 from anton.application.llm_schemas.character_edit import EditedCharacter
 from anton.domain.models import Character
 from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
+
+
+class EditAgentState(TypedDict):
+    """Hold the character being edited and the chat history of the edit agent."""
+
+    # add_messages appends new messages to the history instead of replacing it.
+    messages: Annotated[list[AnyMessage], add_messages]
+    character: Character
 
 
 async def edit_character(client: SLMClient, character: Character, changes: str) -> Character:
