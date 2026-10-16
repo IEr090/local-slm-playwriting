@@ -55,7 +55,7 @@ async def edit_character(client: SLMClient, character: Character, changes: str) 
         system_prompt=load_prompt("character_edit.md"),
         user_prompt=user_prompt,
         response_model=EditedCharacter,
-        think=True,
+        think=False,
     )
     return Character(id=character.id, relationships=character.relationships, **edited.model_dump())
 
@@ -110,10 +110,16 @@ class EditAgent:
 
     async def _chat(self, state: EditAgentState) -> dict:
         """Let the model answer the user and say whether changes were agreed."""
+        # The last message is kept apart from the history, so a small model answers it instead of continuing the list.
+        *history, last = state["messages"]
         user_prompt = json.dumps(
             {
                 "character": state["character"].model_dump(exclude={"id", "relationships"}),
-                "messages": [message.model_dump() for message in _to_chat_messages(state["messages"])],
+                "history": [
+                    {"speaker": "playwright" if isinstance(message, HumanMessage) else "dramaturg", "text": message.content}
+                    for message in history
+                ],
+                "playwright_message": last.content,
             },
             ensure_ascii=False,
         )
@@ -121,7 +127,7 @@ class EditAgent:
             system_prompt=load_prompt("character_edit_chat.md"),
             user_prompt=user_prompt,
             response_model=EditChatTurn,
-            think=True,
+            think=False,
         )
         changes = (turn.apply_changes or "").strip() or None
         if changes:

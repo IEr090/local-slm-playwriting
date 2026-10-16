@@ -27,7 +27,12 @@ class EditedCharacter(BaseModel):
 class EditChatTurn(BaseModel):
     """Represent one answer of the edit agent in the chat."""
 
-    reply: str = Field(description="Message to the user.")
+    reply: str = Field(
+        description="Your own answer to the playwright's message, in their language. Never repeat or quote their message.",
+    )
     apply_changes: str | None = Field(
-        description="The changes the user has explicitly agreed to, in free text. Null until the user agreed.",
+        description=(
+            "Only right after the playwright agreed to your proposal: the agreed new value of every affected field, "
+            "written in the language of the profile. Otherwise null."
+        ),
     )

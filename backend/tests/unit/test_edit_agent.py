@@ -63,11 +63,11 @@ class EditCharacterTest(IsolatedAsyncioTestCase):
         prompt = json.loads(self.client.calls[0]["user_prompt"])
         self.assertEqual(prompt["changes"], CHANGES)
 
-    async def test_asks_model_to_think(self) -> None:
-        """Let the model think; the settings may still switch thinking off."""
+    async def test_does_not_let_model_think(self) -> None:
+        """Ask the model to answer without thinking, which is much faster on local hardware."""
         await edit_character(self.client, self.character, CHANGES)
 
-        self.assertTrue(self.client.calls[0]["think"])
+        self.assertFalse(self.client.calls[0]["think"])
 
 
 class EditAgentFirstMessageTest(IsolatedAsyncioTestCase):
@@ -133,8 +133,9 @@ class EditAgentFirstMessageTest(IsolatedAsyncioTestCase):
 
         prompt = json.loads(self.client.calls[0]["user_prompt"])
         self.assertEqual(prompt["character"], make_character().model_dump(exclude={"id", "relationships"}))
-        self.assertEqual(prompt["messages"], [{"role": "user", "content": "Change her."}])
-        self.assertTrue(self.client.calls[0]["think"])
+        self.assertEqual(prompt["history"], [])
+        self.assertEqual(prompt["playwright_message"], "Change her.")
+        self.assertFalse(self.client.calls[0]["think"])
 
 
 class EditAgentConversationTest(IsolatedAsyncioTestCase):
@@ -165,6 +166,23 @@ class EditAgentConversationTest(IsolatedAsyncioTestCase):
                 ChatMessage(role="assistant", content="Older, then. Apply?"),
             ],
         )
+
+    async def test_sends_earlier_turns_as_history_and_latest_message_apart(self) -> None:
+        """Pass the earlier turns with speakers and the latest message on its own to the chat prompt."""
+        agent = self.make_agent(
+            EditChatTurn(reply="In what way?", apply_changes=None),
+            EditChatTurn(reply="Older, then. Apply?", apply_changes=None),
+        )
+
+        await agent.send(make_character(), "Change her.")
+        await agent.send(make_character(), "Make her older.")
+
+        prompt = json.loads(self.client.calls[1]["user_prompt"])
+        self.assertEqual(
+            prompt["history"],
+            [{"speaker": "playwright", "text": "Change her."}, {"speaker": "dramaturg", "text": "In what way?"}],
+        )
+        self.assertEqual(prompt["playwright_message"], "Make her older.")
 
     async def test_takes_character_from_form(self) -> None:
         """Replace the character in the state with the one sent with the message."""
