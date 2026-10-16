@@ -60,20 +60,23 @@ export type CardSourceField = (typeof CARD_SOURCE_FIELDS)[number];
 
 // ---------- chat ----------
 
-export type RevisionDecision = "accept" | "accept_with_adjustments" | "reject";
-
 export type ChatMessage =
   | { role: "user"; text: string }
   | {
       role: "ai";
-      decision: RevisionDecision;
+      /** Fields the AI changed with this answer; empty for messages loaded from the history. */
       changed_fields: (keyof Character)[];
       text: string;
     };
 
+/** One answer of the edit agent: its reply and the character as the agent sees it now (not saved). */
 export interface RevisionResult {
-  decision: RevisionDecision;
-  changed_fields: (keyof Character)[];
+  reply: string;
   character: Character;
-  text: string;
+}
+
+/** A message of the chat history as the backend stores it. */
+export interface HistoryMessage {
+  role: "user" | "assistant";
+  content: string;
 }

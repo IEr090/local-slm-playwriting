@@ -5,6 +5,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, t
 import { matchPath, useLocation, useNavigate } from "react-router";
 import { api } from "@/features/characters/api";
 import { cardSources, cardSourcesChanged } from "@/features/characters/model/card-sources";
+import type { ChatMessage } from "@/features/characters/model/types";
+import { changedFields } from "@/features/characters/model/validation";
 import { paths } from "@/features/characters/paths";
 import { isAbort } from "@/shared/api/errors";
 import { useErrors } from "@/shared/errors/errors-context";
@@ -79,7 +81,31 @@ export function CastProvider({ children }: { children: ReactNode }) {
     navigate(paths.character(character.id));
   }, [navigate]);
 
-  const characterOpened = useCallback(() => dispatch({ type: "characterOpened" }), []);
+  /** Ids whose chat history has been asked for, so it is read from the backend only once. */
+  const historyRequested = useRef(new Set<string>());
+
+  const characterOpened = useCallback(
+    (id: string) => {
+      dispatch({ type: "characterOpened" });
+      const { chats, saved } = stateRef.current;
+      // a new character has no chat on the backend yet
+      if (chats[id] || !saved[id] || historyRequested.current.has(id)) return;
+      historyRequested.current.add(id);
+      api
+        .getChatHistory(id)
+        .then((history) => {
+          const messages: ChatMessage[] = history.map((m) =>
+            m.role === "user" ? { role: "user", text: m.content } : { role: "ai", changed_fields: [], text: m.content },
+          );
+          dispatch({ type: "chatLoaded", id, messages });
+        })
+        .catch((error: unknown) => {
+          historyRequested.current.delete(id);
+          showError(error);
+        });
+    },
+    [showError],
+  );
 
   // ---------- chat ----------
 
@@ -94,8 +120,9 @@ export function CastProvider({ children }: { children: ReactNode }) {
       if (!text || !character || aiTypingFor) return;
       dispatch({ type: "revisionRequested", id, text });
       try {
-        const result = await api.reviseCharacter(character, text);
-        dispatch({ type: "revisionAnswered", id, result });
+        const { reply, character: revised } = await api.reviseCharacter(character, text);
+        // compared with the character that was sent: what the AI changed, not what the user typed meanwhile
+        dispatch({ type: "revisionAnswered", id, reply, character: revised, changed: changedFields(character, revised) });
         clearTimeout(highlightTimer.current);
         highlightTimer.current = setTimeout(() => dispatch({ type: "clearHighlight" }), HIGHLIGHT_MS);
       } catch (error) {

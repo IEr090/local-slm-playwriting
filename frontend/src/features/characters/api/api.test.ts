@@ -1,13 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, configureMock } from "@/features/characters/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api } from "@/features/characters/api";
 import { SEED_CAST } from "@/features/characters/api/mock-data";
 import type { Character } from "@/features/characters/model/types";
 
-beforeEach(() => configureMock({ delayScale: 0, fail: new Set() }));
-afterEach(() => {
-  configureMock({ fail: new Set() });
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.unstubAllGlobals());
 
 /** The seed characters with ids; relationships are left out. */
 const seedCast = (): Character[] =>
@@ -58,33 +54,34 @@ describe("createBlankCharacter", () => {
 });
 
 describe("reviseCharacter", () => {
-  it("only changes personality and reports it", async () => {
+  it("posts the message with the profile without the id and returns the agent's answer", async () => {
     const elena = seedCast()[0];
-    const result = await api.reviseCharacter(elena, "make her more cynical");
-    expect(result.decision).toBe("accept_with_adjustments");
-    expect(result.changed_fields).toEqual(["personality"]);
-    expect(result.character.personality).toBe(`${elena.personality} Revised: Make her more cynical.`);
-    expect({ ...result.character, personality: elena.personality }).toEqual(elena);
-    expect(result.text).toContain("Elena’s personality");
-  });
+    const answer = { reply: "Older, then. Apply?", character: elena };
+    const fetch = vi.fn().mockResolvedValue(Response.json(answer));
+    vi.stubGlobal("fetch", fetch);
 
-  it("replaces an earlier revision instead of stacking them", async () => {
-    const once = await api.reviseCharacter(seedCast()[0], "first");
-    const twice = await api.reviseCharacter(once.character, "second!");
-    expect(twice.character.personality.endsWith(" Revised: Second.")).toBe(true);
-    expect(twice.character.personality).not.toContain("First");
+    await expect(api.reviseCharacter(elena, "make her older")).resolves.toEqual(answer);
+    const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/api/characters/id-0/revise");
+    expect(init.method).toBe("POST");
+    const { id, ...draft } = elena;
+    void id;
+    expect(JSON.parse(init.body)).toEqual({ message: "make her older", character: draft });
   });
 });
 
-describe("?fail=…", () => {
-  it.each([
-    ["chat", () => api.reviseCharacter({ personality: "" } as Character, "x"), "The AI could not revise this character. Is Ollama running?"],
-  ] as const)("%s rejects with an ApiError", async (call, run, message) => {
-    configureMock({ fail: new Set([call]) });
-    const error = await run().catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ApiError);
-    expect((error as ApiError).message).toBe(message);
-    expect((error as ApiError).detail).toContain("localhost:11434");
+describe("getChatHistory", () => {
+  it("reads the chat history of the character from the backend", async () => {
+    const answer = [
+      { role: "user", content: "make her older" },
+      { role: "assistant", content: "Older, then. Apply?" },
+    ];
+    const fetch = vi.fn().mockResolvedValue(Response.json(answer));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(api.getChatHistory("id-0")).resolves.toEqual(answer);
+    expect(fetch.mock.calls[0][0]).toBe("/api/characters/id-0/revise");
+    expect(fetch.mock.calls[0][1].method).toBe("GET");
   });
 });
 

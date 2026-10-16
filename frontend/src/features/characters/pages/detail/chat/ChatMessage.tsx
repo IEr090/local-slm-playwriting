@@ -1,4 +1,4 @@
-import { DECISION_LABEL, FIELD_LABEL } from "@/features/characters/model/labels";
+import { FIELD_LABEL } from "@/features/characters/model/labels";
 import type { ChatMessage as Message } from "@/features/characters/model/types";
 
 const fadeUp = "animate-fade-up";
@@ -15,7 +15,6 @@ export function ChatMessage({ message }: { message: Message }) {
   const changed = [...new Set(message.changed_fields.map((f) => FIELD_LABEL[f]))];
   return (
     <div className={`${fadeUp} max-w-[88%] self-start rounded-[12px_12px_12px_2px] border border-line bg-bubble/80 px-4 py-[14px]`}>
-      <div className="mb-[6px] font-sans text-[11px] tracking-[1px] text-gold">{DECISION_LABEL[message.decision]}</div>
       {changed.length > 0 && <div className="mb-2 font-sans text-xs text-muted-2">Updated: {changed.join(", ")}</div>}
       <div className="font-sans text-[13px] leading-[1.6] text-ink-3">{message.text}</div>
     </div>

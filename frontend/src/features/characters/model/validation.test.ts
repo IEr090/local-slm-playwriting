@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isEmptyProfile, missingFields, missingLabels, REQUIRED_FIELDS, sameProfile } from "./validation";
+import { changedFields, isEmptyProfile, missingFields, missingLabels, REQUIRED_FIELDS, sameProfile } from "./validation";
 import type { Character } from "./types";
 
 const blank: Character = {
@@ -61,7 +61,7 @@ describe("missingFields", () => {
   });
 });
 
-describe("isEmptyProfile / sameProfile", () => {
+describe("isEmptyProfile / sameProfile / changedFields", () => {
   it("sees any entered value, surname and relationships included", () => {
     expect(isEmptyProfile(blank)).toBe(true);
     expect(isEmptyProfile({ ...blank, surname: "H" })).toBe(false);
@@ -71,5 +71,10 @@ describe("isEmptyProfile / sameProfile", () => {
   it("compares profiles but not ids", () => {
     expect(sameProfile(filled(), { ...filled(), id: "other" })).toBe(true);
     expect(sameProfile(filled(), { ...filled(), relationships: [{ character_id: "a", description: "b" }] })).toBe(false);
+  });
+
+  it("lists the profile fields that differ, without the id", () => {
+    expect(changedFields(filled(), { ...filled(), id: "other" })).toEqual([]);
+    expect(changedFields(filled(), { ...filled(), age: 57, personality: "Cynical." })).toEqual(["age", "personality"]);
   });
 });

@@ -2,7 +2,7 @@
 // Which page is shown is decided by the router (URL), not by this state.
 
 import { DEFAULT_PREMISE } from "@/features/characters/api/mock-data";
-import type { Character, CharacterCard, ChatMessage, RevisionResult } from "@/features/characters/model/types";
+import type { Character, CharacterCard, ChatMessage } from "@/features/characters/model/types";
 
 /** idle → running (waiting for the api) → ready (api answered, animation plays the names) → idle. */
 export type GenerationStatus = "idle" | "running" | "ready";
@@ -58,7 +58,8 @@ export type Action =
   | { type: "toggleChat" }
   | { type: "setDraft"; draft: string }
   | { type: "revisionRequested"; id: string; text: string }
-  | { type: "revisionAnswered"; id: string; result: RevisionResult }
+  | { type: "revisionAnswered"; id: string; reply: string; character: Character; changed: (keyof Character)[] }
+  | { type: "chatLoaded"; id: string; messages: ChatMessage[] }
   | { type: "revisionFailed"; id: string }
   | { type: "clearHighlight" }
   | { type: "saveStarted"; id: string; regenerates: boolean }
@@ -118,22 +119,23 @@ export function reducer(state: CastState, action: Action): CastState {
         chats: { ...state.chats, [action.id]: [...(state.chats[action.id] ?? []), { role: "user", text: action.text }] },
       };
     case "revisionAnswered": {
-      const { result } = action;
-      const patch = Object.fromEntries(result.changed_fields.map((f) => [f, result.character[f]]));
+      // only the fields the AI changed are taken over, so edits typed meanwhile are kept
+      const { reply, character, changed } = action;
+      const patch = Object.fromEntries(changed.map((f) => [f, character[f]]));
       return {
         ...state,
         aiTypingFor: null,
         cast: state.cast.map((c) => (c.id === action.id ? { ...c, ...patch, id: c.id } : c)),
         chats: {
           ...state.chats,
-          [action.id]: [
-            ...(state.chats[action.id] ?? []),
-            { role: "ai", decision: result.decision, changed_fields: result.changed_fields, text: result.text },
-          ],
+          [action.id]: [...(state.chats[action.id] ?? []), { role: "ai", changed_fields: changed, text: reply }],
         },
-        highlight: result.changed_fields.length ? { id: action.id, fields: result.changed_fields } : state.highlight,
+        highlight: changed.length ? { id: action.id, fields: changed } : state.highlight,
       };
     }
+    case "chatLoaded":
+      // a message sent before the history arrived already started the chat
+      return state.chats[action.id] ? state : { ...state, chats: { ...state.chats, [action.id]: action.messages } };
     case "revisionFailed":
       return { ...state, aiTypingFor: state.aiTypingFor === action.id ? null : state.aiTypingFor };
     case "clearHighlight":

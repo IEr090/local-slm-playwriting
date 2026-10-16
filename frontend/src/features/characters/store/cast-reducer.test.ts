@@ -67,18 +67,35 @@ describe("cast reducer", () => {
     state = reducer(state, {
       type: "revisionAnswered",
       id: "elena",
-      result: {
-        decision: "accept_with_adjustments",
-        changed_fields: ["personality"],
-        character: { ...elena, personality: "Calm. Revised: Cynical." },
-        text: "done",
-      },
+      reply: "Applying.",
+      character: { ...elena, personality: "Cynical." },
+      changed: ["personality"],
     });
     expect(state.aiTypingFor).toBeNull();
-    expect(state.cast[0]).toMatchObject({ personality: "Calm. Revised: Cynical.", goal: "New goal" });
-    expect(state.chats.elena[1]).toMatchObject({ role: "ai", decision: "accept_with_adjustments", changed_fields: ["personality"] });
+    expect(state.cast[0]).toMatchObject({ personality: "Cynical.", goal: "New goal" });
+    expect(state.chats.elena[1]).toEqual({ role: "ai", changed_fields: ["personality"], text: "Applying." });
     expect(state.highlight).toEqual({ id: "elena", fields: ["personality"] });
     expect(reducer(state, { type: "clearHighlight" }).highlight).toBeNull();
+  });
+
+  it("keeps the character and the highlight when the AI only answers", () => {
+    const elena = character("elena");
+    let state = reducer({ ...initialState, cast: [elena] }, { type: "revisionRequested", id: "elena", text: "change her" });
+    state = reducer(state, { type: "revisionAnswered", id: "elena", reply: "In what way?", character: elena, changed: [] });
+    expect(state.cast[0]).toEqual(elena);
+    expect(state.highlight).toBeNull();
+    expect(state.chats.elena[1]).toEqual({ role: "ai", changed_fields: [], text: "In what way?" });
+  });
+
+  it("loads the chat history unless the chat has already started", () => {
+    const history = [{ role: "user" as const, text: "make her older" }];
+    const loaded = reducer(initialState, { type: "chatLoaded", id: "elena", messages: history });
+    expect(loaded.chats.elena).toEqual(history);
+
+    const started = reducer({ ...initialState, cast: [character("elena")] }, { type: "revisionRequested", id: "elena", text: "new" });
+    expect(reducer(started, { type: "chatLoaded", id: "elena", messages: history }).chats.elena).toEqual([
+      { role: "user", text: "new" },
+    ]);
   });
 
   it("stops the typing indicator when the revision fails", () => {
