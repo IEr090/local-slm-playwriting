@@ -22,3 +22,12 @@ class EditedCharacter(BaseModel):
     fear_weakness: str
     internal_conflict: str
     character_arc: str
+
+
+class EditChatTurn(BaseModel):
+    """Represent one answer of the edit agent in the chat."""
+
+    reply: str = Field(description="Message to the user.")
+    apply_changes: str | None = Field(
+        description="The changes the user has explicitly agreed to, in free text. Null until the user agreed.",
+    )

@@ -1,13 +1,22 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Request
+from pydantic import BaseModel, Field
 
-from anton.api.dependencies import CharacterServiceDep
+from anton.api.dependencies import CharacterServiceDep, EditAgentDep
 from anton.api.disconnect import cancel_on_disconnect
-from anton.domain.models import Cast, CharacterDraft, CharacterWithCard
+from anton.application.edit_agent import ChatMessage, EditAgentReply
+from anton.domain.models import Cast, Character, CharacterDraft, CharacterWithCard
 
 
 router = APIRouter(prefix="/characters", tags=["characters"])
+
+
+class ReviseRequest(BaseModel):
+    """Represent a chat message about a character together with the character from the user's form."""
+
+    message: str = Field(min_length=1)
+    character: CharacterDraft
 
 
 @router.post("/generate")
@@ -39,6 +48,13 @@ async def edit_character(character_id: str, draft: CharacterDraft, service: Char
 
 
 @router.post("/{character_id}/revise")
-async def revise_character(character_id: str) -> None:
-    """Revise the character according to the user's request."""
-    raise NotImplementedError
+async def revise_character(character_id: str, body: ReviseRequest, agent: EditAgentDep) -> EditAgentReply:
+    """Send the user's chat message to the edit agent; the edited character is not saved."""
+    character = Character(id=character_id, **body.character.model_dump())
+    return await agent.send(character, body.message)
+
+
+@router.get("/{character_id}/revise")
+async def get_revise_history(character_id: str, agent: EditAgentDep) -> list[ChatMessage]:
+    """Return the chat history with the edit agent about the character."""
+    return await agent.history(character_id)
