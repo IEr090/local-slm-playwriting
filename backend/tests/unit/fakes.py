@@ -91,3 +91,25 @@ class InMemoryCastRepository:
         """Keep a copy of the cast and count the save."""
         self.cast = cast.model_copy(deep=True)
         self.saves += 1
+
+
+class ScriptedSLMClient:
+    """Return or raise the prepared responses in order, one per call, and remember every call."""
+
+    def __init__(self, *responses: BaseModel | Exception) -> None:
+        """Initialize the client with the responses it returns or raises, in call order."""
+        self.responses = list(responses)
+        self.calls: list[dict] = []
+
+    async def generate(self, system_prompt: str, user_prompt: str, response_model: type[T], think: bool) -> T:
+        """Record the call and return or raise the next prepared response."""
+        self.calls.append({
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "response_model": response_model,
+            "think": think,
+        })
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response

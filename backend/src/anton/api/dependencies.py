@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from anton.application.character_service import CharacterService
+from anton.application.edit_agent import EditAgent, create_checkpointer
 from anton.infrastructure.config import Settings
 from anton.infrastructure.slm import SLMClient, create_slm_client
 from anton.infrastructure.storage import CastRepository, JsonCastRepository
@@ -36,3 +37,12 @@ def get_character_service(
 
 
 CharacterServiceDep = Annotated[CharacterService, Depends(get_character_service)]
+
+
+@lru_cache
+def get_edit_agent() -> EditAgent:
+    """Create one edit agent with an in-memory store of conversations for the whole application."""
+    return EditAgent(get_slm_client(), create_checkpointer())
+
+
+EditAgentDep = Annotated[EditAgent, Depends(get_edit_agent)]

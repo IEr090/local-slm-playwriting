@@ -2,11 +2,13 @@ from unittest import TestCase
 
 from fastapi.testclient import TestClient
 
-from anton.api.dependencies import get_character_service
+from anton.api.dependencies import get_character_service, get_edit_agent
 from anton.application.character_service import CharacterService
+from anton.application.edit_agent import EditAgent, create_checkpointer
+from anton.application.llm_schemas.character_edit import EditChatTurn
 from anton.errors import SLMResponseError, SLMUnavailableError
 from anton.main import app
-from tests.unit.fakes import CARD, FailingSLMClient, FakeSLMClient, InMemoryCastRepository, make_draft
+from tests.unit.fakes import CARD, FailingSLMClient, FakeSLMClient, InMemoryCastRepository, ScriptedSLMClient, make_draft
 
 
 class CreateCharacterRouteTest(TestCase):
@@ -119,3 +121,78 @@ class ModelErrorRouteTest(TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(set(response.json()), {"message", "detail"})
         self.assertEqual(response.json()["detail"], "qwen3:4b returned an invalid GeneratedCast")
+
+
+class ReviseRouteTest(TestCase):
+    """Test the endpoints of the chat that revises a character."""
+
+    def setUp(self) -> None:
+        """Replace the edit agent with one that uses a scripted model client."""
+        self.model = ScriptedSLMClient(EditChatTurn(reply="In what way?", apply_changes=None))
+        agent = EditAgent(self.model, create_checkpointer())
+        app.dependency_overrides[get_edit_agent] = lambda: agent
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        """Remove the dependency override."""
+        app.dependency_overrides.clear()
+
+    def test_post_returns_reply_and_character(self) -> None:
+        """Answer with the model reply and the character under the id from the path."""
+        response = self.client.post(
+            "/api/characters/first/revise",
+            json={"message": "Change her.", "character": make_draft().model_dump()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["reply"], "In what way?")
+        self.assertEqual(body["character"]["id"], "first")
+        self.assertEqual(body["character"]["name"], "Elena")
+
+    def test_post_ignores_id_in_body(self) -> None:
+        """Use the id from the path even if the body character has another one."""
+        character = make_draft().model_dump() | {"id": "client-id"}
+
+        response = self.client.post("/api/characters/first/revise", json={"message": "Change her.", "character": character})
+
+        self.assertEqual(response.json()["character"]["id"], "first")
+        self.assertEqual(len(self.client.get("/api/characters/first/revise").json()), 2)
+
+    def test_post_rejects_empty_message(self) -> None:
+        """Answer 422 without calling the model when the message is empty."""
+        response = self.client.post("/api/characters/first/revise", json={"message": "", "character": make_draft().model_dump()})
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(self.model.calls, [])
+
+    def test_post_model_error_returns_502(self) -> None:
+        """Report an unusable model answer of the chat as 502."""
+        agent = EditAgent(ScriptedSLMClient(SLMResponseError("bad")), create_checkpointer())
+        app.dependency_overrides[get_edit_agent] = lambda: agent
+
+        response = self.client.post(
+            "/api/characters/first/revise",
+            json={"message": "Change her.", "character": make_draft().model_dump()},
+        )
+
+        self.assertEqual(response.status_code, 502)
+
+    def test_get_returns_history(self) -> None:
+        """Return the chat history of the character."""
+        self.client.post("/api/characters/first/revise", json={"message": "Change her.", "character": make_draft().model_dump()})
+
+        response = self.client.get("/api/characters/first/revise")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            [{"role": "user", "content": "Change her."}, {"role": "assistant", "content": "In what way?"}],
+        )
+
+    def test_get_without_conversation_returns_empty_list(self) -> None:
+        """Return an empty history, not 404, for a character nobody has chatted about."""
+        response = self.client.get("/api/characters/unknown/revise")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])

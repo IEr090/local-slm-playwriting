@@ -16,8 +16,8 @@ export interface CastActions {
   addBlank(): Promise<void>;
   /** Opens /cast/:id. */
   openCharacter(id: string): void;
-  /** The detail page shows a (new) character: clears the chat draft, closes the chat panel. */
-  characterOpened(): void;
+  /** The detail page shows a (new) character: clears the chat draft, closes the chat panel, reads its chat history. */
+  characterOpened(id: string): void;
   /** Inline edit of one character (every field is always editable). */
   updateCharacter(id: string, patch: Partial<Omit<Character, "id">>): void;
   /** "ALL CHARACTERS": back to /cast; leaving a character drops its unsaved edits. */

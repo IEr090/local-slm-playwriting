@@ -41,7 +41,12 @@ export function isEmptyProfile(character: Character): boolean {
   return PROFILE_FIELDS.every((f) => isEmpty(character[f]));
 }
 
+/** Profile fields that differ between the two versions (the id is ignored). */
+export function changedFields(a: Character, b: Character): ProfileField[] {
+  return PROFILE_FIELDS.filter((f) => JSON.stringify(a[f]) !== JSON.stringify(b[f]));
+}
+
 /** True if both versions have the same profile (the id is ignored). */
 export function sameProfile(a: Character, b: Character): boolean {
-  return PROFILE_FIELDS.every((f) => JSON.stringify(a[f]) === JSON.stringify(b[f]));
+  return changedFields(a, b).length === 0;
 }

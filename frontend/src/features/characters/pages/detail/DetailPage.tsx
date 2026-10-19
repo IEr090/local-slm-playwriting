@@ -24,10 +24,10 @@ export function DetailPage() {
   const index = cast.findIndex((c) => c.id === id);
   const character = cast[index];
 
-  // a (new) character is shown: empty chat draft, chat panel closed
+  // a (new) character is shown: empty chat draft, chat panel closed, chat history read
   useEffect(() => {
-    characterOpened();
-  }, [id, characterOpened]);
+    if (loaded) characterOpened(id);
+  }, [id, loaded, characterOpened]);
 
   if (!loaded) return null; // the saved cast is still being read after a reload
   if (!character) return <Navigate to={paths.cast} replace />;

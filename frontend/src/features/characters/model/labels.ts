@@ -1,17 +1,11 @@
 // Display labels for the Character Creator UI (kept out of the data model).
 
-import type { Character, DramaticRole, Gender, RevisionDecision } from "./types";
+import type { Character, DramaticRole, Gender } from "./types";
 
 export const GENDER_LABEL: Record<Gender, string> = {
   female: "Female",
   male: "Male",
   other: "Other",
-};
-
-export const DECISION_LABEL: Record<RevisionDecision, string> = {
-  accept: "ACCEPT",
-  accept_with_adjustments: "ACCEPT WITH ADJUSTMENTS",
-  reject: "REJECT",
 };
 
 export const FIELD_LABEL: Record<keyof Character, string> = {
