@@ -1,13 +1,10 @@
 import json
 
+from anton.application.acts_agent import ActsAgent, ActsAgentReply
 from anton.application.agent_chat import ChatMessage
-from anton.application.llm_schemas.act_generation import GeneratedActs
-from anton.application.mappers.act_mapper import to_acts
 from anton.application.outline_agent import OutlineAgent, OutlineAgentReply
-from anton.domain.models import Act, Cast, DramaticFunction, Outline, StoryBible
+from anton.domain.models import Act, ActSummary, Cast, DramaticFunction, Outline, StoryBible
 from anton.errors import ActNotFoundError, CastNotFoundError, StoryNotFoundError, StoryOrderError
-from anton.infrastructure.prompts import load_prompt
-from anton.infrastructure.slm import SLMClient
 from anton.infrastructure.storage import CastRepository, StoryRepository
 
 
@@ -23,21 +20,22 @@ class StoryService:
 
     def __init__(
         self,
-        client: SLMClient,
         story_repository: StoryRepository,
         cast_repository: CastRepository,
         outline_agent: OutlineAgent,
+        acts_agent: ActsAgent,
     ) -> None:
-        """Initialize the service with a model client, the repositories it reads and extends, and the outline agent."""
-        self.client = client
+        """Initialize the service with the repositories it reads and extends and the agents of its pages."""
         self.story_repository = story_repository
         self.cast_repository = cast_repository
         self.outline_agent = outline_agent
+        self.acts_agent = acts_agent
 
     async def start_play(self, user_input: str) -> None:
-        """Start a new Story Bible from the user's initial input and forget the chat about the previous outline."""
+        """Start a new Story Bible from the user's initial input and forget the chats about the previous play."""
         self.story_repository.save(StoryBible(user_input=user_input))
         await self.outline_agent.forget()
+        await self.acts_agent.forget()
 
     def get_story(self) -> StoryBible:
         """Return the saved Story Bible."""
@@ -81,20 +79,13 @@ class StoryService:
         story = self._get_story_with_outline()
         _require_acts_not_approved(story)
 
-        generated = await self.client.generate(
-            system_prompt=load_prompt("act_generation.md"),
-            user_prompt=_sections({
-                "OUTLINE": story.outline.model_dump_json(indent=2),
-                "CAST": _cast_json(self._get_cast(), ACT_CAST_FIELDS),
-            }),
-            response_model=GeneratedActs,
-            think=True,
+        summaries = await self.acts_agent.generate(
+            story.outline.model_dump_json(indent=2), _cast_json(self._get_cast(), ACT_CAST_FIELDS),
         )
-        acts = to_acts(generated.root)
 
         story = self._get_story_with_outline()
         _require_acts_not_approved(story)
-        story.acts = acts
+        story.acts = [Act(**summary.model_dump()) for summary in summaries]
         story.acts_built_from_outline = story.outline.model_copy()
         self.story_repository.save(story)
         return story
@@ -107,6 +98,15 @@ class StoryService:
         act.dramatic_function = dramatic_function
         self.story_repository.save(story)
         return story
+
+    async def revise_acts(self, acts: list[ActSummary], message: str) -> ActsAgentReply:
+        """Send the user's message with the acts from their form to the acts agent; nothing is saved."""
+        story = self._get_story_with_acts()
+        return await self.acts_agent.send(story.outline.synopsis, acts, message)
+
+    async def acts_history(self) -> list[ChatMessage]:
+        """Return the chat history with the acts agent."""
+        return await self.acts_agent.history()
 
     def approve_acts(self) -> StoryBible:
         """Approve the acts, so the structure of the first act can be built."""
@@ -165,7 +165,3 @@ def _cast_json(cast: Cast, fields: set[str]) -> str:
         indent=2,
     )
 
-
-def _sections(sections: dict[str, str]) -> str:
-    """Join the parts of a user prompt under Markdown headings, as the prompts describe them."""
-    return "\n\n".join(f"# {title}\n\n{text}" for title, text in sections.items())

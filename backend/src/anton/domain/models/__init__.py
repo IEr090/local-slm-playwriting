@@ -12,6 +12,7 @@ from anton.domain.models.character import (
 from anton.domain.models.story import (
     Act,
     ActStatus,
+    ActSummary,
     DramaticFunction,
     Genre,
     Outline,
@@ -25,7 +26,7 @@ from anton.domain.models.story import (
 )
 
 __all__ = [
-    "Act", "ActStatus", "Cast", "Character", "CharacterCard", "CharacterDraft", "CharacterHistoryEntry",
+    "Act", "ActStatus", "ActSummary", "Cast", "Character", "CharacterCard", "CharacterDraft", "CharacterHistoryEntry",
     "CharacterWithCard", "DramaticFunction", "DramaticRole",
     "Gender", "Genre", "Outline", "Place", "PlaceDraft", "Relationship", "Scene", "ScenePlan", "SceneStatus",
     "SceneText", "StoryBible",

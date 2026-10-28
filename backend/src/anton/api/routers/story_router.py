@@ -5,9 +5,10 @@ from pydantic import BaseModel, Field
 
 from anton.api.dependencies import StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
+from anton.application.acts_agent import ActsAgentReply
 from anton.application.agent_chat import ChatMessage
 from anton.application.outline_agent import OutlineAgentReply
-from anton.domain.models import DramaticFunction, Outline, StoryBible
+from anton.domain.models import ActSummary, DramaticFunction, Outline, StoryBible
 
 
 router = APIRouter(prefix="/story", tags=["story"])
@@ -18,6 +19,13 @@ class OutlineReviseRequest(BaseModel):
 
     message: str = Field(min_length=1)
     outline: Outline
+
+
+class ActsReviseRequest(BaseModel):
+    """Represent a chat message about the acts together with the acts from the user's form."""
+
+    message: str = Field(min_length=1)
+    acts: list[ActSummary] = Field(min_length=1)
 
 
 @router.get("")
@@ -65,6 +73,18 @@ async def edit_act(
 ) -> StoryBible:
     """Save the summary and dramatic function of an act the user edited by hand."""
     return service.edit_act(number, summary, dramatic_function)
+
+
+@router.post("/acts/revise")
+async def revise_acts(body: ActsReviseRequest, service: StoryServiceDep, request: Request) -> ActsAgentReply:
+    """Send the user's chat message to the acts agent; the revised acts are not saved."""
+    return await cancel_on_disconnect(request, service.revise_acts(body.acts, body.message))
+
+
+@router.get("/acts/revise")
+async def get_acts_revise_history(service: StoryServiceDep) -> list[ChatMessage]:
+    """Return the chat history with the acts agent."""
+    return await service.acts_history()
 
 
 @router.post("/acts/approve")

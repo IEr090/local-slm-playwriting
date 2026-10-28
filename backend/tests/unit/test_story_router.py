@@ -7,9 +7,10 @@ from anton.application.character_service import CharacterService
 from anton.application.story_service import StoryService
 from anton.domain.models import StoryBible
 from anton.main import app
+from anton.application.acts_agent import ActsAgent, create_acts_checkpointer
 from anton.application.outline_agent import OutlineAgent, create_outline_checkpointer
 from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, make_generated_cast
-from tests.unit.test_story_service import GENERATED_ACTS, GENERATED_OUTLINE, PROPOSAL
+from tests.unit.test_story_service import ACTS_PROPOSAL, GENERATED_ACTS, GENERATED_OUTLINE, PROPOSAL, summaries
 from tests.unit.test_story_models import make_outline
 
 
@@ -18,12 +19,15 @@ class StoryRouteTest(TestCase):
 
     def setUp(self) -> None:
         """Replace both services with ones that share a fake model client and in-memory repositories."""
-        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, PROPOSAL, GENERATED_ACTS)
+        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, PROPOSAL, GENERATED_ACTS, ACTS_PROPOSAL)
         cast_repository = InMemoryCastRepository()
         self.story_repository = InMemoryStoryRepository()
-        agent = OutlineAgent(client, create_outline_checkpointer())
+        outline_agent = OutlineAgent(client, create_outline_checkpointer())
+        acts_agent = ActsAgent(client, create_acts_checkpointer())
         app.dependency_overrides[get_character_service] = lambda: CharacterService(client, cast_repository)
-        app.dependency_overrides[get_story_service] = lambda: StoryService(client, self.story_repository, cast_repository, agent)
+        app.dependency_overrides[get_story_service] = lambda: StoryService(
+            self.story_repository, cast_repository, outline_agent, acts_agent,
+        )
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -166,6 +170,28 @@ class StoryRouteTest(TestCase):
         response = self.client.put("/api/story/acts/9", json={"summary": "Nothing.", "dramatic_function": "setup"})
 
         self.assertEqual(response.status_code, 404)
+
+    def test_revises_acts_with_agent(self) -> None:
+        """Return the agent's reply and the acts from the form, and keep both messages in the history."""
+        self.generate_acts()
+        form = [act.model_dump() for act in summaries()]
+
+        response = self.client.post("/api/story/acts/revise", json={"message": "Act Two: crueller Margit.", "acts": form})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"reply": ACTS_PROPOSAL.reply, "acts": form})
+        history = self.client.get("/api/story/acts/revise").json()
+        self.assertEqual([message["role"] for message in history], ["user", "assistant"])
+
+    def test_revise_acts_before_acts_returns_409(self) -> None:
+        """Reject chatting about acts before they are generated."""
+        self.start_play()
+        self.client.post("/api/story/outline/generate")
+        form = [act.model_dump() for act in summaries()]
+
+        response = self.client.post("/api/story/acts/revise", json={"message": "Act Two: more storm.", "acts": form})
+
+        self.assertEqual(response.status_code, 409)
 
     def test_approves_acts(self) -> None:
         """Approve the acts and reject generating them again afterwards."""

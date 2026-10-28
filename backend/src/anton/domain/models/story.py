@@ -60,12 +60,17 @@ class SceneText(BaseModel):
     text: str
 
 
-class Act(BaseModel):
-    """Represent an act of the play, named by its number."""
+class ActSummary(BaseModel):
+    """Represent what the user edits of an act: its summary and dramatic function."""
 
     number: int
     summary: str
     dramatic_function: DramaticFunction
+
+
+class Act(ActSummary):
+    """Represent an act of the play, named by its number."""
+
     status: ActStatus = "draft"
     scenes: list[Scene] = []
     scene_texts: list[SceneText] = []

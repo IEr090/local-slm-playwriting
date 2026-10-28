@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from anton.application.acts_agent import ActsAgent, create_acts_checkpointer
 from anton.application.character_service import CharacterService
 from anton.application.edit_agent import EditAgent, create_checkpointer
 from anton.application.outline_agent import OutlineAgent, create_outline_checkpointer
@@ -62,14 +63,20 @@ def get_outline_agent() -> OutlineAgent:
     return OutlineAgent(get_slm_client(), create_outline_checkpointer())
 
 
+@lru_cache
+def get_acts_agent() -> ActsAgent:
+    """Create one acts agent with an in-memory store of its conversation for the whole application."""
+    return ActsAgent(get_slm_client(), create_acts_checkpointer())
+
+
 def get_story_service(
-    client: Annotated[SLMClient, Depends(get_slm_client)],
     story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
     cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
     outline_agent: Annotated[OutlineAgent, Depends(get_outline_agent)],
+    acts_agent: Annotated[ActsAgent, Depends(get_acts_agent)],
 ) -> StoryService:
-    """Create the story service with the configured SLM client, repositories and outline agent."""
-    return StoryService(client, story_repository, cast_repository, outline_agent)
+    """Create the story service with the configured repositories and page agents."""
+    return StoryService(story_repository, cast_repository, outline_agent, acts_agent)
 
 
 StoryServiceDep = Annotated[StoryService, Depends(get_story_service)]
