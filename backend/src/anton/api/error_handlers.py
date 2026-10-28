@@ -2,7 +2,14 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from anton.api.disconnect import ClientDisconnectedError
-from anton.errors import NotFoundError, SLMResponseError, SLMUnavailableError, StoryNotFoundError, StoryOrderError
+from anton.errors import (
+    ActNotFoundError,
+    NotFoundError,
+    SLMResponseError,
+    SLMUnavailableError,
+    StoryNotFoundError,
+    StoryOrderError,
+)
 
 
 def add_error_handlers(app: FastAPI) -> None:
@@ -22,6 +29,14 @@ def add_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=404,
             content={"message": "No play yet. Generate the characters first.", "detail": str(error)},
+        )
+
+    @app.exception_handler(ActNotFoundError)
+    async def act_not_found(request: Request, error: ActNotFoundError) -> JSONResponse:
+        """Answer 404 when the requested act does not exist."""
+        return JSONResponse(
+            status_code=404,
+            content={"message": "This act does not exist.", "detail": str(error)},
         )
 
     @app.exception_handler(StoryOrderError)

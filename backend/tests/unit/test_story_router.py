@@ -15,7 +15,7 @@ from tests.unit.fakes import (
     InMemoryStoryRepository,
     make_generated_cast,
 )
-from tests.unit.test_story_service import GENERATED_OUTLINE, REVISION
+from tests.unit.test_story_service import ACT_REVISION, GENERATED_ACTS, GENERATED_OUTLINE, REVISION
 from tests.unit.test_story_models import make_outline
 
 
@@ -24,7 +24,7 @@ class StoryRouteTest(TestCase):
 
     def setUp(self) -> None:
         """Replace both services with ones that share a fake model client and in-memory repositories."""
-        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, REVISION)
+        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, REVISION, GENERATED_ACTS, ACT_REVISION)
         cast_repository = InMemoryCastRepository()
         self.story_repository = InMemoryStoryRepository()
         chat_repository = InMemoryChatRepository()
@@ -122,3 +122,72 @@ class StoryRouteTest(TestCase):
         response = self.client.post("/api/story/outline/chat", json={"message": ""})
 
         self.assertEqual(response.status_code, 422)
+
+    def generate_acts(self) -> None:
+        """Start a play and generate its outline and acts."""
+        self.start_play()
+        self.client.post("/api/story/outline/generate")
+        self.client.post("/api/story/acts/generate")
+
+    def test_generates_acts(self) -> None:
+        """Return the Story Bible with numbered draft acts."""
+        self.start_play()
+        self.client.post("/api/story/outline/generate")
+
+        response = self.client.post("/api/story/acts/generate")
+
+        self.assertEqual(response.status_code, 200)
+        acts = response.json()["acts"]
+        self.assertEqual([(act["number"], act["status"]) for act in acts], [(1, "draft"), (2, "draft"), (3, "draft")])
+
+    def test_acts_before_outline_return_409(self) -> None:
+        """Reject generating acts before the outline exists."""
+        self.start_play()
+
+        response = self.client.post("/api/story/acts/generate")
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_outline_edit_after_acts_sets_warning(self) -> None:
+        """Expose the warning flag when the outline changes after the acts were built."""
+        self.generate_acts()
+
+        response = self.client.put("/api/story/outline", json=make_outline().model_dump() | {"title": "The Lamp"})
+
+        self.assertTrue(response.json()["outline_changed"])
+
+    def test_edits_act(self) -> None:
+        """Save the edited summary and dramatic function of an act."""
+        self.generate_acts()
+
+        response = self.client.put("/api/story/acts/2", json={"summary": "Margit hides the logbook.", "dramatic_function": "development"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["acts"][1]["dramatic_function"], "development")
+
+    def test_edit_unknown_act_returns_404(self) -> None:
+        """Answer 404 for an act number that does not exist."""
+        self.generate_acts()
+
+        response = self.client.put("/api/story/acts/9", json={"summary": "Nothing.", "dramatic_function": "setup"})
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_revises_act_in_chat(self) -> None:
+        """Return the revised act and the answer of the acts chat."""
+        self.generate_acts()
+
+        response = self.client.post("/api/story/acts/chat", json={"message": "Act Two: Margit should choose the fire."})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["story"]["acts"][1]["summary"], ACT_REVISION.summary)
+        self.assertEqual(response.json()["reply"]["about"], "Act 2")
+
+    def test_approves_acts(self) -> None:
+        """Approve the acts and reject generating them again afterwards."""
+        self.generate_acts()
+
+        response = self.client.post("/api/story/acts/approve")
+
+        self.assertTrue(response.json()["acts_approved"])
+        self.assertEqual(self.client.post("/api/story/acts/generate").status_code, 409)

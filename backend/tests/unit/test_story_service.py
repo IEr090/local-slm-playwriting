@@ -1,9 +1,10 @@
 from unittest import IsolatedAsyncioTestCase
 
+from anton.application.llm_schemas.act_generation import GeneratedAct, GeneratedActRevision, GeneratedActs
 from anton.application.llm_schemas.outline_generation import GeneratedOutline, GeneratedOutlineRevision
 from anton.application.story_service import OUTLINE_CAST_FIELDS, StoryService
-from anton.domain.models import Cast, Character, ChatMessage, Chat, StoryBible
-from anton.errors import CastNotFoundError, StoryNotFoundError, StoryOrderError
+from anton.domain.models import Act, Cast, Character, ChatMessage, Chat, StoryBible
+from anton.errors import ActNotFoundError, CastNotFoundError, SLMResponseError, StoryNotFoundError, StoryOrderError
 from tests.unit.fakes import FakeSLMClient, InMemoryCastRepository, InMemoryChatRepository, InMemoryStoryRepository, make_draft
 from tests.unit.test_story_models import make_outline
 
@@ -14,6 +15,25 @@ REVISION = GeneratedOutlineRevision(
     outline=GeneratedOutline(**(make_outline().model_dump() | {"tone": "Black comedy."})),
     change_note="Darkened the tone.",
 )
+
+GENERATED_ACTS = GeneratedActs([
+    GeneratedAct(summary=" The siblings arrive. ", dramatic_function="setup"),
+    GeneratedAct(summary="Margit burns the logbook.", dramatic_function="climax"),
+    GeneratedAct(summary="Agnes gives the house to Elias.", dramatic_function="resolution"),
+])
+ACT_REVISION = GeneratedActRevision(
+    act_number=2, summary="Margit burns the logbook rather than relight the lamp.", dramatic_function="climax",
+    change_note="Made Margit choose the fire over the light.",
+)
+
+
+def make_acts() -> list[Act]:
+    """Create the three acts that GENERATED_ACTS describes."""
+    return [
+        Act(number=1, summary="The siblings arrive.", dramatic_function="setup"),
+        Act(number=2, summary="Margit burns the logbook.", dramatic_function="climax"),
+        Act(number=3, summary="Agnes gives the house to Elias.", dramatic_function="resolution"),
+    ]
 
 
 def make_cast() -> Cast:
@@ -197,3 +217,190 @@ class ReviseOutlineTest(IsolatedAsyncioTestCase):
         with self.assertRaises(StoryOrderError):
             await service.revise_outline("Make it darker.")
         self.assertEqual(client.calls, [])
+
+
+class GenerateActsTest(IsolatedAsyncioTestCase):
+    """Test generating the act summaries from the outline and the cast."""
+
+    async def asyncSetUp(self) -> None:
+        """Create the service with a saved outline and cast."""
+        self.service, self.client, self.repository, _ = make_service(
+            GENERATED_ACTS, story=StoryBible(user_input=USER_INPUT, outline=make_outline()), cast=make_cast(),
+        )
+
+    async def test_saves_numbered_acts(self) -> None:
+        """Number the acts from one in the model's order, as drafts without scenes."""
+        story = await self.service.generate_acts()
+
+        self.assertEqual(story.acts, make_acts())
+        self.assertEqual(self.repository.load().acts, make_acts())
+
+    async def test_remembers_outline_for_warning(self) -> None:
+        """Remember the outline the acts were built from, so a later edit can be noticed."""
+        story = await self.service.generate_acts()
+
+        self.assertEqual(story.acts_built_from_outline, make_outline())
+        self.assertFalse(story.outline_changed)
+
+    async def test_sends_outline_and_short_cast(self) -> None:
+        """Give the model the outline and only the names, roles and goals of the cast."""
+        await self.service.generate_acts()
+
+        prompt = self.client.calls[0]["user_prompt"]
+        self.assertIn('"synopsis"', prompt)
+        self.assertIn('"dramatic_role": "protagonist"', prompt)
+        self.assertNotIn("internal_conflict", prompt)
+
+    async def test_regenerates_before_approval(self) -> None:
+        """Replace the acts when they are generated again before they are approved."""
+        await self.service.generate_acts()
+
+        story = await self.service.generate_acts()
+
+        self.assertEqual(len(story.acts), 3)
+        self.assertEqual(len(self.client.calls), 2)
+
+    async def test_rejects_generation_after_approval(self) -> None:
+        """Reject generating the acts again once they are approved."""
+        await self.service.generate_acts()
+        self.service.approve_acts()
+
+        with self.assertRaises(StoryOrderError):
+            await self.service.generate_acts()
+
+    async def test_rejects_generation_before_outline(self) -> None:
+        """Reject generating acts before the outline exists."""
+        service, client, *_ = make_service(GENERATED_ACTS, story=StoryBible(user_input=USER_INPUT), cast=make_cast())
+
+        with self.assertRaises(StoryOrderError):
+            await service.generate_acts()
+        self.assertEqual(client.calls, [])
+
+    async def test_raises_for_no_acts(self) -> None:
+        """Report an unusable answer when the model returned no acts."""
+        service, *_ = make_service(GeneratedActs([]), story=StoryBible(outline=make_outline()), cast=make_cast())
+
+        with self.assertRaises(SLMResponseError):
+            await service.generate_acts()
+
+
+class EditActTest(IsolatedAsyncioTestCase):
+    """Test editing an act by hand."""
+
+    async def asyncSetUp(self) -> None:
+        """Create the service with saved acts."""
+        self.service, _, self.repository, _ = make_service(story=StoryBible(outline=make_outline(), acts=make_acts()))
+
+    async def test_saves_edited_act(self) -> None:
+        """Replace the summary and dramatic function of only the edited act."""
+        story = self.service.edit_act(2, "Margit hides the logbook.", "development")
+
+        self.assertEqual(story.acts[1].summary, "Margit hides the logbook.")
+        self.assertEqual(story.acts[1].dramatic_function, "development")
+        self.assertEqual(self.repository.load().acts[0], make_acts()[0])
+
+    async def test_warns_when_scenes_were_built_from_older_summary(self) -> None:
+        """Set the warning flag when the act's scenes were built from the summary before the edit."""
+        acts = make_acts()
+        acts[0].scenes_built_from_summary = acts[0].summary
+        service, *_ = make_service(story=StoryBible(outline=make_outline(), acts=acts))
+
+        story = service.edit_act(1, "Margit arrives first.", "setup")
+
+        self.assertTrue(story.acts[0].summary_changed)
+
+    async def test_raises_for_unknown_act(self) -> None:
+        """Report an act number that does not exist."""
+        with self.assertRaises(ActNotFoundError):
+            self.service.edit_act(9, "Nothing.", "setup")
+
+
+class ReviseActTest(IsolatedAsyncioTestCase):
+    """Test revising the act the user names in the acts chat."""
+
+    async def asyncSetUp(self) -> None:
+        """Create the service with saved acts."""
+        self.service, self.client, self.repository, self.chats = make_service(
+            ACT_REVISION, story=StoryBible(outline=make_outline(), acts=make_acts()),
+        )
+
+    async def test_saves_revised_act(self) -> None:
+        """Replace only the act the model found in the request."""
+        reply = await self.service.revise_act("Act Two: Margit should choose the fire.")
+
+        self.assertEqual(reply.story.acts[1].summary, ACT_REVISION.summary)
+        self.assertEqual(self.repository.load().acts[1].summary, ACT_REVISION.summary)
+        self.assertEqual(self.repository.load().acts[0], make_acts()[0])
+
+    async def test_answers_with_act_and_changed_fields(self) -> None:
+        """Answer with the model's sentence, the act it changed and the changed fields."""
+        reply = await self.service.revise_act("Act Two: Margit should choose the fire.")
+
+        self.assertEqual(reply.reply.text, ACT_REVISION.change_note)
+        self.assertEqual((reply.reply.about, reply.reply.decision, reply.reply.updated), ("Act 2", "revised", ["summary"]))
+
+    async def test_saves_request_and_answer_in_acts_chat(self) -> None:
+        """Keep both messages in the acts chat and mark the request with the act."""
+        reply = await self.service.revise_act("Act Two: Margit should choose the fire.")
+
+        chat = self.service.get_chat("acts")
+        self.assertEqual(chat.messages, [
+            ChatMessage(role="user", text="Act Two: Margit should choose the fire.", about="Act 2"),
+            reply.reply,
+        ])
+
+    async def test_sends_synopsis_acts_and_request(self) -> None:
+        """Give the model the synopsis, every act and the request."""
+        await self.service.revise_act("Act Two: Margit should choose the fire.")
+
+        prompt = self.client.calls[0]["user_prompt"]
+        self.assertIn(f"# SYNOPSIS\n\n{make_outline().synopsis}", prompt)
+        self.assertIn('"summary": "Agnes gives the house to Elias."', prompt)
+        self.assertIn("# REQUEST\n\nAct Two: Margit should choose the fire.", prompt)
+
+    async def test_asks_which_act_when_none_named(self) -> None:
+        """Change nothing and ask which act is meant when the model found no act."""
+        unclear = ACT_REVISION.model_copy(update={"act_number": None})
+        service, _, repository, _ = make_service(unclear, story=StoryBible(outline=make_outline(), acts=make_acts()))
+
+        reply = await service.revise_act("Make Margit crueller.")
+
+        self.assertEqual(reply.reply.decision, "which_act")
+        self.assertEqual(repository.load().acts, make_acts())
+
+    async def test_asks_which_act_for_unknown_number(self) -> None:
+        """Treat an act number that does not exist like a request that names no act."""
+        unknown = ACT_REVISION.model_copy(update={"act_number": 7})
+        service, *_ = make_service(unknown, story=StoryBible(outline=make_outline(), acts=make_acts()))
+
+        reply = await service.revise_act("Act Seven: more storm.")
+
+        self.assertEqual(reply.reply.decision, "which_act")
+
+    async def test_rejects_revision_before_acts(self) -> None:
+        """Reject revising acts that have not been generated yet."""
+        service, client, *_ = make_service(ACT_REVISION, story=StoryBible(outline=make_outline()))
+
+        with self.assertRaises(StoryOrderError):
+            await service.revise_act("Act Two: more storm.")
+        self.assertEqual(client.calls, [])
+
+
+class ApproveActsTest(IsolatedAsyncioTestCase):
+    """Test approving the acts."""
+
+    async def test_approves_acts(self) -> None:
+        """Mark the acts as approved and save it."""
+        service, _, repository, _ = make_service(story=StoryBible(outline=make_outline(), acts=make_acts()))
+
+        story = service.approve_acts()
+
+        self.assertTrue(story.acts_approved)
+        self.assertTrue(repository.load().acts_approved)
+
+    async def test_rejects_approval_before_acts(self) -> None:
+        """Reject approving acts that have not been generated yet."""
+        service, *_ = make_service(story=StoryBible(outline=make_outline()))
+
+        with self.assertRaises(StoryOrderError):
+            service.approve_acts()

@@ -26,5 +26,9 @@ class StoryNotFoundError(NotFoundError):
     """Represent a play that has not been started yet."""
 
 
+class ActNotFoundError(NotFoundError):
+    """Represent an act number that is not in the Story Bible."""
+
+
 class StoryOrderError(Exception):
     """Represent a step of the Story Bible that is not possible in the current state, e.g. writing text before all scenes are approved."""
