@@ -15,7 +15,7 @@ The user provides two sections:
 
 # TASK
 
-1. Decide how many acts the story needs. Most plays need three to five acts.
+1. Decide how many acts the story needs: three, four or five. Never fewer than three, never more than five.
 2. Divide the synopsis into these acts, from the beginning to the ending.
 3. For every act, write its summary and choose its dramatic function.
 
@@ -40,7 +40,7 @@ For each act, fill in the following fields. Field keys are given in backticks.
 
 # OUTPUT
 
-Return a JSON array with one object per act, in the order of the play, using exactly the field keys listed in the **Act Fields** section.
+Return a JSON array with three to five objects, one per act, in the order of the play, using exactly the field keys listed in the **Act Fields** section.
 
 Do not add extra fields.
 

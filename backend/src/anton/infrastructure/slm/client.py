@@ -18,3 +18,7 @@ class SLMClient(Protocol):
     ) -> T:
         """Generate and validate a structured response, optionally letting the model think first."""
         ...
+
+    async def close(self) -> None:
+        """Close the connection to the model server."""
+        ...

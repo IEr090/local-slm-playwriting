@@ -23,6 +23,7 @@ class StoryGenerationTest(IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         """Create every service with one model client and shared in-memory repositories, as the API does."""
         client = create_test_client()
+        self.addAsyncCleanup(client.close)
         self.cast_repository = InMemoryCastRepository()
         self.story_repository = InMemoryStoryRepository()
         act_checkpointer = create_checkpointer()
@@ -90,10 +91,10 @@ class StoryGenerationTest(IsolatedAsyncioTestCase):
         )
 
     def assert_acts(self, story: StoryBible) -> None:
-        """Check that the acts are numbered in order, have summaries and start with the setup."""
+        """Check that there are three to five acts, numbered in order, with summaries, starting with the setup."""
         summaries = [(act.number, act.dramatic_function, act.summary) for act in story.acts]
 
-        self.assertGreaterEqual(len(story.acts), 2, f"Generated acts: {summaries}")
+        self.assertIn(len(story.acts), range(3, 6), f"Generated acts: {summaries}")
         self.assertEqual([act.number for act in story.acts], list(range(1, len(story.acts) + 1)))
         self.assertTrue(all(act.summary.strip() for act in story.acts), f"Generated acts: {summaries}")
         self.assertEqual(story.acts[0].dramatic_function, "setup", f"Generated acts: {summaries}")

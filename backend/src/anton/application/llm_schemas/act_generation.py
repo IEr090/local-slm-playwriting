@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from pydantic import BaseModel, Field, RootModel
 
 from anton.domain.models import DramaticFunction
@@ -10,7 +12,12 @@ class GeneratedAct(BaseModel):
     dramatic_function: DramaticFunction
 
 
-class GeneratedActs(RootModel[list[GeneratedAct]]):
+MIN_ACTS = 3
+MAX_ACTS = 5
+
+
+# The limits are part of the JSON schema sent to the model, so a small model cannot return a play of one act.
+class GeneratedActs(RootModel[Annotated[list[GeneratedAct], Field(min_length=MIN_ACTS, max_length=MAX_ACTS)]]):
     """Represent all acts of the play, in order, as the language model generates them."""
 
 

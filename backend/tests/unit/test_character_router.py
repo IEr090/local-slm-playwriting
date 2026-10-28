@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from fastapi.testclient import TestClient
 
-from anton.api.dependencies import get_character_service, get_edit_agent
+from anton.api.dependencies import get_character_service, get_edit_agent, get_slm_client
 from anton.application.character_service import CharacterService
 from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
@@ -197,3 +197,17 @@ class ReviseRouteTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [])
+
+
+class LifespanTest(TestCase):
+    """Test what the application does when it stops."""
+
+    def test_closes_model_client_on_shutdown(self) -> None:
+        """Close the shared model client once the application stops."""
+        model = get_slm_client()
+
+        with TestClient(app):
+            pass
+
+        self.assertTrue(model.client._client.is_closed)
+        get_slm_client.cache_clear()

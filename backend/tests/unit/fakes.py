@@ -62,6 +62,8 @@ class FakeSLMClient:
         })
         return self.responses[response_model]
 
+    async def close(self) -> None:
+        """Do nothing; there is no connection to close."""
 
 class FailingSLMClient:
     """Raise the prepared error on every call."""
@@ -74,6 +76,8 @@ class FailingSLMClient:
         """Raise the prepared error."""
         raise self.error
 
+    async def close(self) -> None:
+        """Do nothing; there is no connection to close."""
 
 class InMemoryCastRepository:
     """Keep the cast in memory and count every save."""
@@ -114,6 +118,8 @@ class ScriptedSLMClient:
             raise response
         return response
 
+    async def close(self) -> None:
+        """Do nothing; there is no connection to close."""
 
 class InMemoryStoryRepository:
     """Keep the Story Bible in memory and count every save."""

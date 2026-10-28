@@ -8,7 +8,7 @@ from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.outline_generation import GeneratedOutline
 from anton.application.story_service import OUTLINE_CAST_FIELDS, StoryService
 from anton.domain.models import Act, ActSummary, Cast, Character, StoryBible
-from anton.errors import ActNotFoundError, CastNotFoundError, SLMResponseError, StoryNotFoundError, StoryOrderError
+from anton.errors import ActNotFoundError, CastNotFoundError, StoryNotFoundError, StoryOrderError
 from tests.unit.fakes import FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, make_draft
 from tests.unit.test_story_models import make_outline
 
@@ -258,14 +258,6 @@ class GenerateActsTest(IsolatedAsyncioTestCase):
         with self.assertRaises(StoryOrderError):
             await service.generate_acts()
         self.assertEqual(client.calls, [])
-
-    async def test_raises_for_no_acts(self) -> None:
-        """Report an unusable answer when the model returned no acts."""
-        service, *_ = make_service(GeneratedActs([]), story=StoryBible(outline=make_outline()), cast=make_cast())
-
-        with self.assertRaises(SLMResponseError):
-            await service.generate_acts()
-
 
 class EditActTest(IsolatedAsyncioTestCase):
     """Test editing an act by hand."""

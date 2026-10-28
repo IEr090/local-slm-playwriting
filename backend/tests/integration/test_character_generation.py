@@ -22,7 +22,9 @@ class CharacterGenerationTest(IsolatedAsyncioTestCase):
 
     async def test_generates_cast(self) -> None:
         """Generate complete profiles and cards for Elena, Mark, and Anna."""
-        service = CharacterService(create_test_client(), InMemoryCastRepository())
+        client = create_test_client()
+        self.addAsyncCleanup(client.close)
+        service = CharacterService(client, InMemoryCastRepository())
 
         cast = await service.generate_cast(USER_PROMPT)
 

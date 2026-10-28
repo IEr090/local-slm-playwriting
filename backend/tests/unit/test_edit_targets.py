@@ -1,12 +1,13 @@
 from unittest import TestCase
 
+from pydantic import ValidationError
+
 from anton.application.agents.acts_target import ActsTarget
 from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.outline_target import OutlineTarget
 from anton.application.llm_schemas.act_generation import EditedAct, EditedActs, GeneratedActs
 from anton.application.llm_schemas.outline_generation import GeneratedOutline
 from anton.domain.models import Relationship
-from anton.errors import SLMResponseError
 from tests.unit.test_chat_edit_agent import HISTORY, make_character, make_edited
 from tests.unit.test_story_models import make_outline
 from tests.unit.test_story_service import GENERATED_ACTS, summaries
@@ -63,10 +64,20 @@ class ActsTargetTest(TestCase):
         """Number the acts from one in the model's order, with trimmed text."""
         self.assertEqual(ActsTarget().from_generated(GENERATED_ACTS), summaries())
 
-    def test_raises_for_no_acts(self) -> None:
-        """Report an unusable answer when the model returned no acts."""
-        with self.assertRaises(SLMResponseError):
-            ActsTarget().from_generated(GeneratedActs([]))
+    def test_schema_allows_three_to_five_acts(self) -> None:
+        """Reject a model answer with fewer than three or more than five acts."""
+        act = GENERATED_ACTS.root[0]
+
+        for count in (1, 2, 6):
+            with self.assertRaises(ValidationError):
+                GeneratedActs([act] * count)
+        self.assertEqual(len(GeneratedActs([act] * 5).root), 5)
+
+    def test_schema_tells_model_the_limits(self) -> None:
+        """Send the limits to the model as part of the JSON schema."""
+        schema = GeneratedActs.model_json_schema()
+
+        self.assertEqual((schema["minItems"], schema["maxItems"]), (3, 5))
 
     def test_replaces_only_edited_act(self) -> None:
         """Change the act the model edited and keep the others."""
