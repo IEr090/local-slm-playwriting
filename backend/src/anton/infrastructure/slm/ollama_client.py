@@ -57,3 +57,7 @@ class OllamaClient(SLMClient):
             return response_model.model_validate_json(response.message.content)
         except ValidationError as error:
             raise SLMResponseError(f"{self.model} returned an invalid {response_model.__name__}") from error
+
+    async def close(self) -> None:
+        """Close the connection to the Ollama server."""
+        await self.client.close()

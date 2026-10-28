@@ -3,7 +3,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from anton.application.llm_schemas.character_generation import GeneratedCard, GeneratedCast, GeneratedCharacter
-from anton.domain.models import Cast, CharacterDraft
+from anton.domain.models import Cast, CharacterDraft, StoryBible
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -62,6 +62,8 @@ class FakeSLMClient:
         })
         return self.responses[response_model]
 
+    async def close(self) -> None:
+        """Do nothing; there is no connection to close."""
 
 class FailingSLMClient:
     """Raise the prepared error on every call."""
@@ -74,6 +76,8 @@ class FailingSLMClient:
         """Raise the prepared error."""
         raise self.error
 
+    async def close(self) -> None:
+        """Do nothing; there is no connection to close."""
 
 class InMemoryCastRepository:
     """Keep the cast in memory and count every save."""
@@ -113,3 +117,24 @@ class ScriptedSLMClient:
         if isinstance(response, Exception):
             raise response
         return response
+
+    async def close(self) -> None:
+        """Do nothing; there is no connection to close."""
+
+class InMemoryStoryRepository:
+    """Keep the Story Bible in memory and count every save."""
+
+    def __init__(self, story: StoryBible | None = None) -> None:
+        """Initialize the repository, optionally with an already saved Story Bible."""
+        self.story = story.model_copy(deep=True) if story is not None else None
+        self.saves = 0
+
+    def load(self) -> StoryBible | None:
+        """Return a copy of the saved Story Bible, like a real storage would."""
+        return self.story.model_copy(deep=True) if self.story is not None else None
+
+    def save(self, story: StoryBible) -> None:
+        """Keep a copy of the Story Bible and count the save."""
+        self.story = story.model_copy(deep=True)
+        self.saves += 1
+

@@ -6,7 +6,7 @@ Local SLM-based multi-agent system for generating theatre plays.
 
 - Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/)
-- [Ollama](https://ollama.com/) for character generation
+- [Ollama](https://ollama.com/) for every generation (characters and the Story Bible)
 
 ## Run
 
@@ -42,6 +42,73 @@ uv run python -m unittest discover -s tests/unit -t .         # fast, no model n
 uv run python -m unittest discover -s tests/integration -t .  # needs Ollama; thinking is always off
 ```
 
+The integration tests generate a cast and then the whole first act (outline, acts, scenes, text and character histories), so they take several minutes. Run one of them with, for example, `uv run python -m unittest tests.integration.test_story_generation`.
+
+## API
+
+All endpoints are under `/api`. Steps that are not possible yet (for example writing the text before every scene is approved) are rejected with `409` and a `message` that says what to do first. Long generations stop when the client cancels the request.
+
+### Characters
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| `POST` | `/characters/generate` | `{premise}` | the cast; also starts a new Story Bible from the premise |
+| `GET` | `/characters` | | the cast with cards and the characters' histories |
+| `POST` | `/characters` | character profile | the new character with its card |
+| `PUT` | `/characters/{id}` | character profile | the edited character; its history is kept |
+| `POST` | `/characters/{id}/revise` | `{message, character}` | `{reply, character}`; nothing is saved |
+| `GET` | `/characters/{id}/revise` | | chat history |
+
+### Story Bible: outline and acts
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| `GET` | `/story` | | the Story Bible with its warning flags |
+| `POST` | `/story/outline/generate` | | the Story Bible with the outline |
+| `PUT` | `/story/outline` | outline | the Story Bible |
+| `POST` | `/story/outline/revise` | `{message, outline}` | `{reply, outline}`; nothing is saved |
+| `GET` | `/story/outline/revise` | | chat history |
+| `POST` | `/story/acts/generate` | | the Story Bible with the acts; not after they are approved |
+| `PUT` | `/story/acts/{n}` | `{summary, dramatic_function}` | the Story Bible |
+| `POST` | `/story/acts/revise` | `{message, acts}` | `{reply, acts}`; nothing is saved |
+| `GET` | `/story/acts/revise` | | chat history |
+| `POST` | `/story/acts/approve` | | the Story Bible |
+
+### Story Bible: one act page
+
+An act can be built once the acts are approved and the text of the act before it is approved.
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| `GET` / `POST` | `/story/places` | place (for `POST`) | all places / the new place |
+| `POST` | `/story/acts/{n}/structure/generate` | | the Story Bible with the proposed scenes and new places |
+| `PUT` | `/story/acts/{n}/scenes` | scenes in their new order | the Story Bible; only while the structure is a draft |
+| `POST` | `/story/acts/{n}/structure/revise` | `{message, scenes}` | `{reply, scenes, places}`; only new places are saved |
+| `POST` | `/story/acts/{n}/structure/approve` | | the Story Bible |
+| `POST` | `/story/acts/{n}/scenes/{no}/plan` | | the Story Bible; scene `no - 1` must be approved |
+| `PUT` | `/story/acts/{n}/scenes/{no}` | scene plan | the Story Bible; the scene becomes a draft again |
+| `POST` | `/story/acts/{n}/scenes/revise` | `{message, scenes}` | `{reply, scenes, places}`; only new places are saved |
+| `POST` | `/story/acts/{n}/scenes/{no}/approve` | | the Story Bible; the last one approves the act's scenes |
+| `POST` | `/story/acts/{n}/scenes/{no}/reopen` | | the Story Bible |
+| `POST` | `/story/acts/{n}/text/generate` | | the Story Bible with the text, written scene by scene |
+| `PUT` | `/story/acts/{n}/text` | scene texts | the Story Bible |
+| `POST` | `/story/acts/{n}/text/revise` | `{message, scene_texts}` | `{reply, scene_texts}`; nothing is saved |
+| `POST` | `/story/acts/{n}/text/approve` | | the Story Bible; appends the act's changes to the characters' histories |
+| `GET` | `/story/acts/{n}/chat` | | chat history of the act page |
+
+### Warning flags
+
+The Story Bible says when something was changed after later steps were built from it; nothing is rewritten automatically:
+
+- `outline_changed`: the outline differs from the one the acts were built from;
+- `summary_changed` (per act): the act summary differs from the one its scenes were built from;
+- `outdated_plans` (per act): scenes whose plan was written before an earlier scene changed;
+- `scenes_changed` (per act): the scenes differ from the ones the text was written from.
+
+### Chats
+
+Every page has its own agent built from one LangGraph graph (`application/agents/chat_edit_agent.py`): the agent proposes a change, applies it once the user agrees and returns the changed data, which the frontend puts into its fields and saves. The chats are kept in memory and are lost when the backend restarts.
+
 ## Project structure
 
 - `backend/src/anton/`: Python package and application entry point.
@@ -54,8 +121,8 @@ uv run python -m unittest discover -s tests/integration -t .  # needs Ollama; th
 
 ## Storage
 
-The cast is saved to `backend/data/cast.json` after every generation, creation and edit, so it survives a backend restart. A new generation replaces the saved cast. Set `ANTON_DATA_DIR` to store the data in another folder.
+The cast is saved to `backend/data/cast.json` after every generation, creation and edit, so it survives a backend restart. A new generation replaces the saved cast and starts a new Story Bible. The Story Bible (outline, acts with scenes and text, places) is saved to `backend/data/story_bible.json`; the characters' histories are part of `cast.json`. Set `ANTON_DATA_DIR` to store the data in another folder.
 
 ## Status
 
-Backend skeleton: FastAPI app with stubbed character endpoints.
+Backend: characters and the Story Bible from the outline to the approved text of every act with the characters' histories. A critic that checks the whole play is not built yet.

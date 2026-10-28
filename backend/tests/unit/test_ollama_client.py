@@ -68,3 +68,16 @@ class OllamaClientThinkingTest(IsolatedAsyncioTestCase):
     async def test_switched_off_thinking_wins(self) -> None:
         """Never think when thinking is switched off, even if the caller asks for it."""
         self.assertFalse(await self.think_sent(thinking=False, think=True))
+
+
+class OllamaClientCloseTest(IsolatedAsyncioTestCase):
+    """Test closing the connection to the Ollama server."""
+
+    async def test_closes_ollama_client(self) -> None:
+        """Close the underlying Ollama client."""
+        client = OllamaClient(model="qwen3:4b", num_ctx=1024)
+        client.client.close = AsyncMock()
+
+        await client.close()
+
+        client.client.close.assert_awaited_once()
