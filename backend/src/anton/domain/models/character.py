@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 Gender = Literal["female", "male", "other"]
@@ -15,6 +15,14 @@ class Relationship(BaseModel):
 
     character_id: str
     description: str
+
+
+class CharacterHistoryEntry(BaseModel):
+    """Represent what changed for a character in one scene of an approved act."""
+
+    act_number: int
+    scene_number: int
+    change: str
 
 
 class CharacterDraft(BaseModel):
@@ -40,9 +48,10 @@ class CharacterDraft(BaseModel):
 
 
 class Character(CharacterDraft):
-    """Represent a generated character."""
+    """Represent a generated character with the history of its changes during the play."""
 
     id: str
+    history: list[CharacterHistoryEntry] = Field(default_factory=list)
 
 
 class CharacterCard(BaseModel):

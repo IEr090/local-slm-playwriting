@@ -73,6 +73,8 @@ class CharacterService:
         # Another request may have saved the cast while the card was generated.
         cast = self.get_cast()
         old = _find(cast, character_id)
+        # The history is written by the story service and is not part of the user's profile.
+        character.history = old.history
         cast.characters[cast.characters.index(old)] = character
         cast.cards[character_id] = card
         self.repository.save(cast)

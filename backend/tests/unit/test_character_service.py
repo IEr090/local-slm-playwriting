@@ -4,7 +4,7 @@ from uuid import UUID
 
 from anton.application.character_service import CARD_SOURCE_FIELDS, CharacterService
 from anton.errors import CastNotFoundError, CharacterNotFoundError
-from anton.domain.models import Cast, Character, CharacterCard
+from anton.domain.models import Cast, Character, CharacterCard, CharacterHistoryEntry
 from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, make_draft, make_generated_cast
 
 
@@ -33,7 +33,8 @@ class CreateCharacterTest(IsolatedAsyncioTestCase):
         result = await self.service.create_character(self.draft)
 
         UUID(result.character.id)
-        self.assertEqual(result.character.model_dump(exclude={"id"}), self.draft.model_dump())
+        self.assertEqual(result.character.model_dump(exclude={"id", "history"}), self.draft.model_dump())
+        self.assertEqual(result.character.history, [])
 
     async def test_builds_card_from_model_response(self) -> None:
         """Take the card text from the model and the role label from the profile."""
@@ -121,6 +122,17 @@ class EditCharacterTest(IsolatedAsyncioTestCase):
         self.assertEqual(len(self.client.calls), 1)
         self.assertEqual(result.card.tagline, CARD.tagline)
         self.assertEqual(self.repository.load().cards["first"], result.card)
+
+    async def test_keeps_history(self) -> None:
+        """Keep the character's history, which the user's profile does not contain."""
+        cast = make_cast()
+        cast.characters[0].history = [CharacterHistoryEntry(act_number=1, scene_number=2, change="Learns about the debt.")]
+        self.repository.save(cast)
+
+        result = await self.service.edit_character("first", make_draft().model_copy(update={"age": 48}))
+
+        self.assertEqual(result.character.history, cast.characters[0].history)
+        self.assertEqual(self.repository.load().characters[0].history, cast.characters[0].history)
 
     async def test_raises_for_unknown_character(self) -> None:
         """Report a character id that is not in the saved cast."""
