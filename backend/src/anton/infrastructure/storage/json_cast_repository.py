@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from anton.domain.models import Cast
+from anton.infrastructure.storage.atomic_file import write_atomically
 
 
 class JsonCastRepository:
@@ -17,8 +18,5 @@ class JsonCastRepository:
         return Cast.model_validate_json(self.path.read_text(encoding="utf-8"))
 
     def save(self, cast: Cast) -> None:
-        """Write the cast to a temporary file first so a crash never leaves a broken file."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(cast.model_dump_json(indent=2), encoding="utf-8")
-        temporary.replace(self.path)
+        """Replace the saved cast without ever leaving a broken file."""
+        write_atomically(self.path, cast.model_dump_json(indent=2))

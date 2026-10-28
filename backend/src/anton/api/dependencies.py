@@ -7,7 +7,14 @@ from anton.application.character_service import CharacterService
 from anton.application.edit_agent import EditAgent, create_checkpointer
 from anton.infrastructure.config import Settings
 from anton.infrastructure.slm import SLMClient, create_slm_client
-from anton.infrastructure.storage import CastRepository, JsonCastRepository
+from anton.infrastructure.storage import (
+    CastRepository,
+    ChatRepository,
+    JsonCastRepository,
+    JsonChatRepository,
+    JsonStoryRepository,
+    StoryRepository,
+)
 
 
 @lru_cache
@@ -26,6 +33,18 @@ def get_slm_client() -> SLMClient:
 def get_cast_repository() -> CastRepository:
     """Create one cast repository in the configured data directory for the whole application."""
     return JsonCastRepository(get_settings().data_dir / "cast.json")
+
+
+@lru_cache
+def get_story_repository() -> StoryRepository:
+    """Create one Story Bible repository in the configured data directory for the whole application."""
+    return JsonStoryRepository(get_settings().data_dir / "story_bible.json")
+
+
+@lru_cache
+def get_chat_repository() -> ChatRepository:
+    """Create one chat repository in the configured data directory for the whole application."""
+    return JsonChatRepository(get_settings().data_dir / "chats.json")
 
 
 def get_character_service(
