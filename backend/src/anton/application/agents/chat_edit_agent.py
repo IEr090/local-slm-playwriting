@@ -28,6 +28,9 @@ STATE_MODELS = [
     ("anton.domain.models.character", "Relationship"),
     ("anton.domain.models.story", "Outline"),
     ("anton.domain.models.story", "ActSummary"),
+    ("anton.domain.models.story", "PlaceDraft"),
+    ("anton.application.agents.scene_targets", "SceneBoard"),
+    ("anton.application.agents.scene_targets", "SceneView"),
 ]
 
 
@@ -88,7 +91,7 @@ class ChatEditState(TypedDict):
     # What the data is generated from, e.g. the user's idea and the cast; empty when nothing is generated.
     source: dict[str, str]
     # What the model reads but never changes, e.g. the synopsis while the acts are edited.
-    context: dict[str, str]
+    context: dict[str, Any]
     changes: str | None
     # The reply is held back until the agreed changes are applied.
     pending_reply: str | None
@@ -124,7 +127,7 @@ class ChatEditAgent(Generic[D]):
             )
             return result["data"]
 
-    async def send(self, thread_id: str, data: D, message: str, context: dict[str, str] | None = None) -> ChatEditResult[D]:
+    async def send(self, thread_id: str, data: D, message: str, context: dict[str, Any] | None = None) -> ChatEditResult[D]:
         """Send the user's message with the data from their form and return the agent's answer."""
         context = context or {}
         config = _config(thread_id)

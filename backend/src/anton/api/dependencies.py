@@ -2,12 +2,16 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
+from langgraph.checkpoint.memory import InMemorySaver
 
 from anton.application.agents.acts_target import ActsTarget
 from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.agents.outline_target import OutlineTarget
+from anton.application.agents.scene_targets import SceneBoard, ScenesTarget, StructureTarget
 from anton.application.character_service import CharacterService
+from anton.application.scene_planner import ScenePlanner
+from anton.application.scene_service import SceneService
 from anton.application.story_service import StoryService
 from anton.domain.models import ActSummary, Character, Outline
 from anton.infrastructure.config import Settings
@@ -82,3 +86,35 @@ def get_story_service(
 
 
 StoryServiceDep = Annotated[StoryService, Depends(get_story_service)]
+
+
+@lru_cache
+def get_act_checkpointer() -> InMemorySaver:
+    """Create one store of the act page conversations, shared by both agents of the page."""
+    return create_checkpointer()
+
+
+@lru_cache
+def get_structure_agent() -> ChatEditAgent[SceneBoard]:
+    """Create one agent that proposes and edits the scenes of an act."""
+    return ChatEditAgent(get_slm_client(), StructureTarget(), get_act_checkpointer())
+
+
+@lru_cache
+def get_scenes_agent() -> ChatEditAgent[SceneBoard]:
+    """Create one agent that edits the plans of the scenes of an act."""
+    return ChatEditAgent(get_slm_client(), ScenesTarget(), get_act_checkpointer())
+
+
+def get_scene_service(
+    story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
+    cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
+    structure_agent: Annotated[ChatEditAgent[SceneBoard], Depends(get_structure_agent)],
+    scenes_agent: Annotated[ChatEditAgent[SceneBoard], Depends(get_scenes_agent)],
+    client: Annotated[SLMClient, Depends(get_slm_client)],
+) -> SceneService:
+    """Create the scene service with the configured repositories, act page agents and scene planner."""
+    return SceneService(story_repository, cast_repository, structure_agent, scenes_agent, ScenePlanner(client))
+
+
+SceneServiceDep = Annotated[SceneService, Depends(get_scene_service)]

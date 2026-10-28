@@ -51,7 +51,7 @@ class StoryService:
         _require_no_outline(story)
 
         outline = await self.outline_agent.generate(
-            OUTLINE_THREAD, {"idea": story.user_input, "cast": _cast_json(self._get_cast(), OUTLINE_CAST_FIELDS)},
+            OUTLINE_THREAD, {"idea": story.user_input, "cast": cast_json(self._get_cast(), OUTLINE_CAST_FIELDS)},
         )
 
         # Another request may have saved the Story Bible while the outline was generated.
@@ -84,7 +84,7 @@ class StoryService:
 
         summaries = await self.acts_agent.generate(
             ACTS_THREAD,
-            {"outline": story.outline.model_dump_json(indent=2), "cast": _cast_json(self._get_cast(), ACT_CAST_FIELDS)},
+            {"outline": story.outline.model_dump_json(indent=2), "cast": cast_json(self._get_cast(), ACT_CAST_FIELDS)},
         )
 
         story = self._get_story_with_outline()
@@ -97,7 +97,7 @@ class StoryService:
     def edit_act(self, number: int, summary: str, dramatic_function: DramaticFunction) -> StoryBible:
         """Replace the summary and dramatic function of an act with the ones the user edited by hand."""
         story = self.get_story()
-        act = _find_act(story, number)
+        act = find_act(story, number)
         act.summary = summary
         act.dramatic_function = dramatic_function
         self.story_repository.save(story)
@@ -153,7 +153,7 @@ def _require_acts_not_approved(story: StoryBible) -> None:
         raise StoryOrderError("The acts are already approved. Edit them instead.")
 
 
-def _find_act(story: StoryBible, number: int) -> Act:
+def find_act(story: StoryBible, number: int) -> Act:
     """Return the act with the given number."""
     for act in story.acts:
         if act.number == number:
@@ -161,7 +161,7 @@ def _find_act(story: StoryBible, number: int) -> Act:
     raise ActNotFoundError(f"Act {number} is not in the Story Bible.")
 
 
-def _cast_json(cast: Cast, fields: set[str]) -> str:
+def cast_json(cast: Cast, fields: set[str]) -> str:
     """Write the given fields of every character as a JSON array."""
     return json.dumps(
         [character.model_dump(include=fields) for character in cast.characters],

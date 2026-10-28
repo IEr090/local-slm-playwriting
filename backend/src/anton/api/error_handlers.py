@@ -5,6 +5,8 @@ from anton.api.disconnect import ClientDisconnectedError
 from anton.errors import (
     ActNotFoundError,
     NotFoundError,
+    PlaceNotFoundError,
+    SceneNotFoundError,
     SLMResponseError,
     SLMUnavailableError,
     StoryNotFoundError,
@@ -37,6 +39,22 @@ def add_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=404,
             content={"message": "This act does not exist.", "detail": str(error)},
+        )
+
+    @app.exception_handler(SceneNotFoundError)
+    async def scene_not_found(request: Request, error: SceneNotFoundError) -> JSONResponse:
+        """Answer 404 when the requested scene does not exist."""
+        return JSONResponse(
+            status_code=404,
+            content={"message": "This scene does not exist.", "detail": str(error)},
+        )
+
+    @app.exception_handler(PlaceNotFoundError)
+    async def place_not_found(request: Request, error: PlaceNotFoundError) -> JSONResponse:
+        """Answer 404 when a scene names a place that does not exist."""
+        return JSONResponse(
+            status_code=404,
+            content={"message": "This place does not exist.", "detail": str(error)},
         )
 
     @app.exception_handler(StoryOrderError)

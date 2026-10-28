@@ -52,6 +52,10 @@ class Scene(ScenePlan):
     status: SceneStatus = "draft"
     plan_built_from: list[ScenePlan] | None = None
 
+    def to_plan(self) -> ScenePlan:
+        """Keep only the plan fields of the scene."""
+        return ScenePlan(**self.model_dump(include=set(ScenePlan.model_fields)))
+
 
 class SceneText(BaseModel):
     """Represent the dialogue and stage directions written for one scene of an act."""
@@ -125,4 +129,4 @@ class StoryBible(BaseModel):
 
 def _plans(scenes: list[Scene]) -> list[ScenePlan]:
     """Keep only the plan fields of the scenes, so approving or numbering them does not count as a change."""
-    return [ScenePlan(**scene.model_dump(include=set(ScenePlan.model_fields))) for scene in scenes]
+    return [scene.to_plan() for scene in scenes]

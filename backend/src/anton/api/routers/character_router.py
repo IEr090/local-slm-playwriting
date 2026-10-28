@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Request
 from pydantic import BaseModel, Field
 
-from anton.api.dependencies import CharacterServiceDep, EditAgentDep, StoryServiceDep
+from anton.api.dependencies import CharacterServiceDep, EditAgentDep, SceneServiceDep, StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
 from anton.application.agents.chat_edit_agent import ChatMessage
 from anton.domain.models import Cast, Character, CharacterDraft, CharacterWithCard
@@ -31,6 +31,7 @@ async def generate_cast(
     premise: Annotated[str, Body(embed=True, min_length=1)],
     service: CharacterServiceDep,
     story_service: StoryServiceDep,
+    scene_service: SceneServiceDep,
     request: Request,
 ) -> Cast:
     """Generate the whole cast with cards from a premise; stop generating if the client cancels.
@@ -38,6 +39,7 @@ async def generate_cast(
     The premise is the user's initial input, so a new Story Bible is started from it.
     """
     cast = await cancel_on_disconnect(request, service.generate_cast(premise))
+    await scene_service.forget_act_chats()
     await story_service.start_play(premise)
     return cast
 
