@@ -5,9 +5,7 @@ from pydantic import BaseModel, Field
 
 from anton.api.dependencies import StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
-from anton.application.acts_agent import ActsAgentReply
-from anton.application.agent_chat import ChatMessage
-from anton.application.outline_agent import OutlineAgentReply
+from anton.application.agents.chat_edit_agent import ChatMessage
 from anton.domain.models import ActSummary, DramaticFunction, Outline, StoryBible
 
 
@@ -21,11 +19,25 @@ class OutlineReviseRequest(BaseModel):
     outline: Outline
 
 
+class OutlineRevision(BaseModel):
+    """Represent the answer of the outline agent and the outline as it sees it now."""
+
+    reply: str
+    outline: Outline
+
+
 class ActsReviseRequest(BaseModel):
     """Represent a chat message about the acts together with the acts from the user's form."""
 
     message: str = Field(min_length=1)
     acts: list[ActSummary] = Field(min_length=1)
+
+
+class ActsRevision(BaseModel):
+    """Represent the answer of the acts agent and the acts as it sees them now."""
+
+    reply: str
+    acts: list[ActSummary]
 
 
 @router.get("")
@@ -47,9 +59,10 @@ async def edit_outline(outline: Outline, service: StoryServiceDep) -> StoryBible
 
 
 @router.post("/outline/revise")
-async def revise_outline(body: OutlineReviseRequest, service: StoryServiceDep, request: Request) -> OutlineAgentReply:
+async def revise_outline(body: OutlineReviseRequest, service: StoryServiceDep, request: Request) -> OutlineRevision:
     """Send the user's chat message to the outline agent; the revised outline is not saved."""
-    return await cancel_on_disconnect(request, service.revise_outline(body.outline, body.message))
+    result = await cancel_on_disconnect(request, service.revise_outline(body.outline, body.message))
+    return OutlineRevision(reply=result.reply, outline=result.data)
 
 
 @router.get("/outline/revise")
@@ -76,9 +89,10 @@ async def edit_act(
 
 
 @router.post("/acts/revise")
-async def revise_acts(body: ActsReviseRequest, service: StoryServiceDep, request: Request) -> ActsAgentReply:
+async def revise_acts(body: ActsReviseRequest, service: StoryServiceDep, request: Request) -> ActsRevision:
     """Send the user's chat message to the acts agent; the revised acts are not saved."""
-    return await cancel_on_disconnect(request, service.revise_acts(body.acts, body.message))
+    result = await cancel_on_disconnect(request, service.revise_acts(body.acts, body.message))
+    return ActsRevision(reply=result.reply, acts=result.data)
 
 
 @router.get("/acts/revise")

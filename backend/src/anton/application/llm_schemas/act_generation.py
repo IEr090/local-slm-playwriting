@@ -22,17 +22,3 @@ class EditedAct(GeneratedAct):
 
 class EditedActs(RootModel[list[EditedAct]]):
     """Represent only the acts the agreed changes are about, as the language model returns them."""
-
-
-class ActsChatTurn(BaseModel):
-    """Represent one answer of the acts agent in the chat."""
-
-    reply: str = Field(
-        description="Your own answer to the playwright's message, in their language. Never repeat or quote their message.",
-    )
-    apply_changes: str | None = Field(
-        description=(
-            "Only right after the playwright agreed to your proposal: the act number and the agreed new value of every "
-            "affected field, written in the language of the acts. Otherwise null."
-        ),
-    )

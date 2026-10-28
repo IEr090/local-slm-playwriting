@@ -4,8 +4,9 @@ from fastapi.testclient import TestClient
 
 from anton.api.dependencies import get_character_service, get_edit_agent
 from anton.application.character_service import CharacterService
-from anton.application.edit_agent import EditAgent, create_checkpointer
-from anton.application.llm_schemas.character_edit import EditChatTurn
+from anton.application.agents.character_target import CharacterTarget
+from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
+from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.errors import SLMResponseError, SLMUnavailableError
 from anton.main import app
 from tests.unit.fakes import CARD, FailingSLMClient, FakeSLMClient, InMemoryCastRepository, ScriptedSLMClient, make_draft
@@ -128,8 +129,8 @@ class ReviseRouteTest(TestCase):
 
     def setUp(self) -> None:
         """Replace the edit agent with one that uses a scripted model client."""
-        self.model = ScriptedSLMClient(EditChatTurn(reply="In what way?", apply_changes=None))
-        agent = EditAgent(self.model, create_checkpointer())
+        self.model = ScriptedSLMClient(ChatTurn(reply="In what way?", apply_changes=None))
+        agent = ChatEditAgent(self.model, CharacterTarget(), create_checkpointer())
         app.dependency_overrides[get_edit_agent] = lambda: agent
         self.client = TestClient(app)
 
@@ -168,7 +169,7 @@ class ReviseRouteTest(TestCase):
 
     def test_post_model_error_returns_502(self) -> None:
         """Report an unusable model answer of the chat as 502."""
-        agent = EditAgent(ScriptedSLMClient(SLMResponseError("bad")), create_checkpointer())
+        agent = ChatEditAgent(ScriptedSLMClient(SLMResponseError("bad")), CharacterTarget(), create_checkpointer())
         app.dependency_overrides[get_edit_agent] = lambda: agent
 
         response = self.client.post(

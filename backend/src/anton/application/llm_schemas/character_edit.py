@@ -22,17 +22,3 @@ class EditedCharacter(BaseModel):
     fear_weakness: str
     internal_conflict: str
     character_arc: str
-
-
-class EditChatTurn(BaseModel):
-    """Represent one answer of the edit agent in the chat."""
-
-    reply: str = Field(
-        description="Your own answer to the playwright's message, in their language. Never repeat or quote their message.",
-    )
-    apply_changes: str | None = Field(
-        description=(
-            "Only right after the playwright agreed to your proposal: the agreed new value of every affected field, "
-            "written in the language of the profile. Otherwise null."
-        ),
-    )

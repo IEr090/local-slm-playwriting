@@ -1,9 +1,11 @@
 from unittest import IsolatedAsyncioTestCase
 
-from anton.application.acts_agent import ActsAgent, create_acts_checkpointer
-from anton.application.llm_schemas.act_generation import ActsChatTurn, GeneratedAct, GeneratedActs
-from anton.application.llm_schemas.outline_generation import GeneratedOutline, OutlineChatTurn
-from anton.application.outline_agent import OutlineAgent, create_outline_checkpointer
+from anton.application.agents.acts_target import ActsTarget
+from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
+from anton.application.agents.outline_target import OutlineTarget
+from anton.application.llm_schemas.act_generation import GeneratedAct, GeneratedActs
+from anton.application.llm_schemas.chat_turn import ChatTurn
+from anton.application.llm_schemas.outline_generation import GeneratedOutline
 from anton.application.story_service import OUTLINE_CAST_FIELDS, StoryService
 from anton.domain.models import Act, ActSummary, Cast, Character, StoryBible
 from anton.errors import ActNotFoundError, CastNotFoundError, SLMResponseError, StoryNotFoundError, StoryOrderError
@@ -13,8 +15,8 @@ from tests.unit.test_story_models import make_outline
 
 USER_INPUT = "A lighthouse keeper dies and leaves the house to the housekeeper."
 GENERATED_OUTLINE = GeneratedOutline(**(make_outline().model_dump() | {"title": "  The Salt House  "}))
-PROPOSAL = OutlineChatTurn(reply="I suggest a darker tone. Confirm?", apply_changes=None)
-ACTS_PROPOSAL = ActsChatTurn(reply="I suggest a crueller Margit in Act 2. Confirm?", apply_changes=None)
+PROPOSAL = ChatTurn(reply="I suggest a darker tone. Confirm?", apply_changes=None)
+ACTS_PROPOSAL = ChatTurn(reply="I suggest a crueller Margit in Act 2. Confirm?", apply_changes=None)
 
 GENERATED_ACTS = GeneratedActs([
     GeneratedAct(summary=" The siblings arrive. ", dramatic_function="setup"),
@@ -46,12 +48,12 @@ def make_service(
     *responses,
     story: StoryBible | None = None,
     cast: Cast | None = None,
-) -> tuple[StoryService, FakeSLMClient, InMemoryStoryRepository, OutlineAgent]:
+) -> tuple[StoryService, FakeSLMClient, InMemoryStoryRepository, ChatEditAgent]:
     """Create the story service with in-memory repositories and page agents that share a fake model client."""
     client = FakeSLMClient(*responses)
     story_repository = InMemoryStoryRepository(story)
-    outline_agent = OutlineAgent(client, create_outline_checkpointer())
-    acts_agent = ActsAgent(client, create_acts_checkpointer())
+    outline_agent = ChatEditAgent(client, OutlineTarget(), create_checkpointer())
+    acts_agent = ChatEditAgent(client, ActsTarget(), create_checkpointer())
     service = StoryService(story_repository, InMemoryCastRepository(cast), outline_agent, acts_agent)
     return service, client, story_repository, outline_agent
 
@@ -69,7 +71,7 @@ class StartPlayTest(IsolatedAsyncioTestCase):
 
     async def test_forgets_old_chats(self) -> None:
         """Forget the conversations about the outline and the acts of the previous play."""
-        service, *_ = make_service(PROPOSAL, ACTS_PROPOSAL, story=StoryBible(outline=make_outline(), acts=make_acts()))
+        service, *_ = make_service(PROPOSAL, story=StoryBible(outline=make_outline(), acts=make_acts()))
         await service.revise_outline(make_outline(), "Make it darker.")
         await service.revise_acts(summaries(), "Act Two: crueller Margit.")
 
@@ -169,7 +171,7 @@ class ReviseOutlineTest(IsolatedAsyncioTestCase):
         reply = await service.revise_outline(form, "Make it darker.")
 
         self.assertEqual(reply.reply, PROPOSAL.reply)
-        self.assertEqual(reply.outline, form)
+        self.assertEqual(reply.data, form)
 
     async def test_does_not_save(self) -> None:
         """Leave the saved outline unchanged; the user saves it from the form."""
@@ -308,7 +310,7 @@ class ReviseActsTest(IsolatedAsyncioTestCase):
         reply = await service.revise_acts(form, "Act Two: crueller Margit.")
 
         self.assertEqual(reply.reply, ACTS_PROPOSAL.reply)
-        self.assertEqual(reply.acts, form)
+        self.assertEqual(reply.data, form)
 
     async def test_sends_saved_synopsis(self) -> None:
         """Give the agent the synopsis of the saved outline."""

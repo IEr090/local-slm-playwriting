@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from anton.api.dependencies import CharacterServiceDep, EditAgentDep, StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
-from anton.application.edit_agent import ChatMessage, EditAgentReply
+from anton.application.agents.chat_edit_agent import ChatMessage
 from anton.domain.models import Cast, Character, CharacterDraft, CharacterWithCard
 
 
@@ -17,6 +17,13 @@ class ReviseRequest(BaseModel):
 
     message: str = Field(min_length=1)
     character: CharacterDraft
+
+
+class CharacterRevision(BaseModel):
+    """Represent the answer of the edit agent and the character as it sees it now."""
+
+    reply: str
+    character: Character
 
 
 @router.post("/generate")
@@ -54,10 +61,12 @@ async def edit_character(character_id: str, draft: CharacterDraft, service: Char
 
 
 @router.post("/{character_id}/revise")
-async def revise_character(character_id: str, body: ReviseRequest, agent: EditAgentDep) -> EditAgentReply:
+async def revise_character(character_id: str, body: ReviseRequest, agent: EditAgentDep) -> CharacterRevision:
     """Send the user's chat message to the edit agent; the edited character is not saved."""
     character = Character(id=character_id, **body.character.model_dump())
-    return await agent.send(character, body.message)
+    # Every character has its own conversation.
+    result = await agent.send(character_id, character, body.message)
+    return CharacterRevision(reply=result.reply, character=result.data)
 
 
 @router.get("/{character_id}/revise")

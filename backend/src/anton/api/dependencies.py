@@ -3,11 +3,13 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from anton.application.acts_agent import ActsAgent, create_acts_checkpointer
+from anton.application.agents.acts_target import ActsTarget
+from anton.application.agents.character_target import CharacterTarget
+from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
+from anton.application.agents.outline_target import OutlineTarget
 from anton.application.character_service import CharacterService
-from anton.application.edit_agent import EditAgent, create_checkpointer
-from anton.application.outline_agent import OutlineAgent, create_outline_checkpointer
 from anton.application.story_service import StoryService
+from anton.domain.models import ActSummary, Character, Outline
 from anton.infrastructure.config import Settings
 from anton.infrastructure.slm import SLMClient, create_slm_client
 from anton.infrastructure.storage import CastRepository, JsonCastRepository, JsonStoryRepository, StoryRepository
@@ -49,31 +51,31 @@ CharacterServiceDep = Annotated[CharacterService, Depends(get_character_service)
 
 
 @lru_cache
-def get_edit_agent() -> EditAgent:
-    """Create one edit agent with an in-memory store of conversations for the whole application."""
-    return EditAgent(get_slm_client(), create_checkpointer())
+def get_edit_agent() -> ChatEditAgent[Character]:
+    """Create one agent that edits characters, with an in-memory store of conversations, for the whole application."""
+    return ChatEditAgent(get_slm_client(), CharacterTarget(), create_checkpointer())
 
 
-EditAgentDep = Annotated[EditAgent, Depends(get_edit_agent)]
-
-
-@lru_cache
-def get_outline_agent() -> OutlineAgent:
-    """Create one outline agent with an in-memory store of its conversation for the whole application."""
-    return OutlineAgent(get_slm_client(), create_outline_checkpointer())
+EditAgentDep = Annotated[ChatEditAgent[Character], Depends(get_edit_agent)]
 
 
 @lru_cache
-def get_acts_agent() -> ActsAgent:
-    """Create one acts agent with an in-memory store of its conversation for the whole application."""
-    return ActsAgent(get_slm_client(), create_acts_checkpointer())
+def get_outline_agent() -> ChatEditAgent[Outline]:
+    """Create one agent that writes and edits the outline, with an in-memory store of its conversation."""
+    return ChatEditAgent(get_slm_client(), OutlineTarget(), create_checkpointer())
+
+
+@lru_cache
+def get_acts_agent() -> ChatEditAgent[list[ActSummary]]:
+    """Create one agent that writes and edits the acts, with an in-memory store of its conversation."""
+    return ChatEditAgent(get_slm_client(), ActsTarget(), create_checkpointer())
 
 
 def get_story_service(
     story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
     cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
-    outline_agent: Annotated[OutlineAgent, Depends(get_outline_agent)],
-    acts_agent: Annotated[ActsAgent, Depends(get_acts_agent)],
+    outline_agent: Annotated[ChatEditAgent[Outline], Depends(get_outline_agent)],
+    acts_agent: Annotated[ChatEditAgent[list[ActSummary]], Depends(get_acts_agent)],
 ) -> StoryService:
     """Create the story service with the configured repositories and page agents."""
     return StoryService(story_repository, cast_repository, outline_agent, acts_agent)

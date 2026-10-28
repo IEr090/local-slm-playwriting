@@ -7,8 +7,9 @@ from anton.application.character_service import CharacterService
 from anton.application.story_service import StoryService
 from anton.domain.models import StoryBible
 from anton.main import app
-from anton.application.acts_agent import ActsAgent, create_acts_checkpointer
-from anton.application.outline_agent import OutlineAgent, create_outline_checkpointer
+from anton.application.agents.acts_target import ActsTarget
+from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
+from anton.application.agents.outline_target import OutlineTarget
 from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, make_generated_cast
 from tests.unit.test_story_service import ACTS_PROPOSAL, GENERATED_ACTS, GENERATED_OUTLINE, PROPOSAL, summaries
 from tests.unit.test_story_models import make_outline
@@ -19,12 +20,13 @@ class StoryRouteTest(TestCase):
 
     def setUp(self) -> None:
         """Replace both services with ones that share a fake model client and in-memory repositories."""
-        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, PROPOSAL, GENERATED_ACTS, ACTS_PROPOSAL)
         cast_repository = InMemoryCastRepository()
         self.story_repository = InMemoryStoryRepository()
-        outline_agent = OutlineAgent(client, create_outline_checkpointer())
-        acts_agent = ActsAgent(client, create_acts_checkpointer())
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(client, cast_repository)
+        # Both agents answer in the chat with the same schema, so each gets its own model client.
+        outline_agent = ChatEditAgent(FakeSLMClient(GENERATED_OUTLINE, PROPOSAL), OutlineTarget(), create_checkpointer())
+        acts_agent = ChatEditAgent(FakeSLMClient(GENERATED_ACTS, ACTS_PROPOSAL), ActsTarget(), create_checkpointer())
+        character_client = FakeSLMClient(make_generated_cast(), CARD)
+        app.dependency_overrides[get_character_service] = lambda: CharacterService(character_client, cast_repository)
         app.dependency_overrides[get_story_service] = lambda: StoryService(
             self.story_repository, cast_repository, outline_agent, acts_agent,
         )
