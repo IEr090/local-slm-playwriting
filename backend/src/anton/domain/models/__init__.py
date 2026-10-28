@@ -9,7 +9,6 @@ from anton.domain.models.character import (
     Gender,
     Relationship,
 )
-from anton.domain.models.chat import Chat, ChatDecision, ChatMessage, ChatReply, ChatRole
 from anton.domain.models.story import (
     Act,
     ActStatus,
@@ -27,7 +26,7 @@ from anton.domain.models.story import (
 
 __all__ = [
     "Act", "ActStatus", "Cast", "Character", "CharacterCard", "CharacterDraft", "CharacterHistoryEntry",
-    "CharacterWithCard", "Chat", "ChatDecision", "ChatMessage", "ChatReply", "ChatRole", "DramaticFunction", "DramaticRole",
+    "CharacterWithCard", "DramaticFunction", "DramaticRole",
     "Gender", "Genre", "Outline", "Place", "PlaceDraft", "Relationship", "Scene", "ScenePlan", "SceneStatus",
     "SceneText", "StoryBible",
 ]

@@ -12,7 +12,3 @@ def to_acts(generated: list[GeneratedAct]) -> list[Act]:
         for number, item in enumerate(generated, start=1)
     ]
 
-
-def changed_act_fields(old: Act, new: Act) -> list[str]:
-    """Return the keys of the act fields the user can edit that differ."""
-    return [field for field in ("summary", "dramatic_function") if getattr(old, field) != getattr(new, field)]

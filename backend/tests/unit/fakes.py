@@ -3,7 +3,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from anton.application.llm_schemas.character_generation import GeneratedCard, GeneratedCast, GeneratedCharacter
-from anton.domain.models import Cast, CharacterDraft, Chat, StoryBible
+from anton.domain.models import Cast, CharacterDraft, StoryBible
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -132,23 +132,3 @@ class InMemoryStoryRepository:
         self.story = story.model_copy(deep=True)
         self.saves += 1
 
-
-class InMemoryChatRepository:
-    """Keep the chats in memory by id."""
-
-    def __init__(self) -> None:
-        """Initialize the repository without chats."""
-        self.chats: dict[str, Chat] = {}
-
-    def load(self, chat_id: str) -> Chat:
-        """Return a copy of the saved chat, or an empty chat with this id."""
-        chat = self.chats.get(chat_id)
-        return chat.model_copy(deep=True) if chat is not None else Chat(id=chat_id)
-
-    def save(self, chat: Chat) -> None:
-        """Keep a copy of the chat."""
-        self.chats[chat.id] = chat.model_copy(deep=True)
-
-    def clear(self) -> None:
-        """Remove all chats."""
-        self.chats = {}

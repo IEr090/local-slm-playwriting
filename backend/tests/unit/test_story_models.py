@@ -5,8 +5,6 @@ from pydantic import ValidationError
 from anton.domain.models import (
     Act,
     Cast,
-    Chat,
-    ChatMessage,
     Character,
     Outline,
     Place,
@@ -76,11 +74,6 @@ class ValidationTest(TestCase):
         with self.assertRaises(ValidationError):
             Scene.model_validate(make_scene(1).model_dump() | {"status": "done"})
 
-    def test_rejects_unknown_chat_decision(self) -> None:
-        """Allow only the decisions the chat can show."""
-        with self.assertRaises(ValidationError):
-            ChatMessage(role="assistant", text="Done.", decision="ignored")
-
     def test_starts_act_empty(self) -> None:
         """Start a new act as a draft without scenes and text."""
         act = Act(number=1, summary="The siblings arrive.", dramatic_function="setup")
@@ -131,15 +124,6 @@ class SerializationTest(TestCase):
 
         self.assertIn("outline_changed", data)
         self.assertTrue({"text", "summary_changed", "scenes_changed", "outdated_plans"} <= set(data["acts"][0]))
-
-    def test_round_trips_chat(self) -> None:
-        """Read back the same chat that was written."""
-        chat = Chat(id="act-1", messages=[
-            ChatMessage(role="user", text="Scene 3: Agnes should already know.", about="Scene 3"),
-            ChatMessage(role="assistant", text="Rewrote Scene 3.", decision="revised", updated=["Scene 3 · What happens"]),
-        ])
-
-        self.assertEqual(Chat.model_validate_json(chat.model_dump_json()), chat)
 
 
 class ActTextTest(TestCase):

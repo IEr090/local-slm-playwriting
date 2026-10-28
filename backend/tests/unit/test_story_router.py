@@ -7,15 +7,9 @@ from anton.application.character_service import CharacterService
 from anton.application.story_service import StoryService
 from anton.domain.models import StoryBible
 from anton.main import app
-from tests.unit.fakes import (
-    CARD,
-    FakeSLMClient,
-    InMemoryCastRepository,
-    InMemoryChatRepository,
-    InMemoryStoryRepository,
-    make_generated_cast,
-)
-from tests.unit.test_story_service import ACT_REVISION, GENERATED_ACTS, GENERATED_OUTLINE, REVISION
+from anton.application.outline_agent import OutlineAgent, create_outline_checkpointer
+from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, make_generated_cast
+from tests.unit.test_story_service import GENERATED_ACTS, GENERATED_OUTLINE, PROPOSAL
 from tests.unit.test_story_models import make_outline
 
 
@@ -24,12 +18,12 @@ class StoryRouteTest(TestCase):
 
     def setUp(self) -> None:
         """Replace both services with ones that share a fake model client and in-memory repositories."""
-        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, REVISION, GENERATED_ACTS, ACT_REVISION)
+        client = FakeSLMClient(make_generated_cast(), CARD, GENERATED_OUTLINE, PROPOSAL, GENERATED_ACTS)
         cast_repository = InMemoryCastRepository()
         self.story_repository = InMemoryStoryRepository()
-        chat_repository = InMemoryChatRepository()
+        agent = OutlineAgent(client, create_outline_checkpointer())
         app.dependency_overrides[get_character_service] = lambda: CharacterService(client, cast_repository)
-        app.dependency_overrides[get_story_service] = lambda: StoryService(client, self.story_repository, cast_repository, chat_repository)
+        app.dependency_overrides[get_story_service] = lambda: StoryService(client, self.story_repository, cast_repository, agent)
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -101,25 +95,25 @@ class StoryRouteTest(TestCase):
 
         self.assertEqual(response.status_code, 422)
 
-    def test_revises_outline_in_chat(self) -> None:
-        """Return the revised Story Bible and the answer, and keep both messages in the chat."""
+    def test_revises_outline_with_agent(self) -> None:
+        """Return the agent's reply and the outline from the form, and keep both messages in the history."""
         self.start_play()
         self.client.post("/api/story/outline/generate")
+        form = make_outline().model_dump() | {"title": "The Lamp"}
 
-        response = self.client.post("/api/story/outline/chat", json={"message": "Make it darker."})
+        response = self.client.post("/api/story/outline/revise", json={"message": "Make it darker.", "outline": form})
 
         self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["story"]["outline"]["tone"], "Black comedy.")
-        self.assertEqual(body["reply"]["updated"], ["tone"])
-        messages = self.client.get("/api/story/chats/outline").json()["messages"]
-        self.assertEqual([message["role"] for message in messages], ["user", "assistant"])
+        self.assertEqual(response.json(), {"reply": PROPOSAL.reply, "outline": form})
+        history = self.client.get("/api/story/outline/revise").json()
+        self.assertEqual([message["role"] for message in history], ["user", "assistant"])
+        self.assertEqual(self.client.get("/api/story").json()["outline"]["title"], "The Salt House")
 
-    def test_empty_chat_message_returns_422(self) -> None:
+    def test_empty_revise_message_returns_422(self) -> None:
         """Reject an empty chat message."""
         self.start_play()
 
-        response = self.client.post("/api/story/outline/chat", json={"message": ""})
+        response = self.client.post("/api/story/outline/revise", json={"message": "", "outline": make_outline().model_dump()})
 
         self.assertEqual(response.status_code, 422)
 
@@ -172,16 +166,6 @@ class StoryRouteTest(TestCase):
         response = self.client.put("/api/story/acts/9", json={"summary": "Nothing.", "dramatic_function": "setup"})
 
         self.assertEqual(response.status_code, 404)
-
-    def test_revises_act_in_chat(self) -> None:
-        """Return the revised act and the answer of the acts chat."""
-        self.generate_acts()
-
-        response = self.client.post("/api/story/acts/chat", json={"message": "Act Two: Margit should choose the fire."})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["story"]["acts"][1]["summary"], ACT_REVISION.summary)
-        self.assertEqual(response.json()["reply"]["about"], "Act 2")
 
     def test_approves_acts(self) -> None:
         """Approve the acts and reject generating them again afterwards."""

@@ -31,7 +31,7 @@ async def generate_cast(
     The premise is the user's initial input, so a new Story Bible is started from it.
     """
     cast = await cancel_on_disconnect(request, service.generate_cast(premise))
-    story_service.start_play(premise)
+    await story_service.start_play(premise)
     return cast
 
 

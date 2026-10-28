@@ -1,13 +1,23 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Request
+from pydantic import BaseModel, Field
 
 from anton.api.dependencies import StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
-from anton.domain.models import Chat, ChatReply, DramaticFunction, Outline, StoryBible
+from anton.application.agent_chat import ChatMessage
+from anton.application.outline_agent import OutlineAgentReply
+from anton.domain.models import DramaticFunction, Outline, StoryBible
 
 
 router = APIRouter(prefix="/story", tags=["story"])
+
+
+class OutlineReviseRequest(BaseModel):
+    """Represent a chat message about the outline together with the outline from the user's form."""
+
+    message: str = Field(min_length=1)
+    outline: Outline
 
 
 @router.get("")
@@ -28,14 +38,16 @@ async def edit_outline(outline: Outline, service: StoryServiceDep) -> StoryBible
     return service.edit_outline(outline)
 
 
-@router.post("/outline/chat")
-async def revise_outline(
-    message: Annotated[str, Body(embed=True, min_length=1)],
-    service: StoryServiceDep,
-    request: Request,
-) -> ChatReply:
-    """Revise the outline as the user asks in the outline chat; stop generating if the client cancels."""
-    return await cancel_on_disconnect(request, service.revise_outline(message))
+@router.post("/outline/revise")
+async def revise_outline(body: OutlineReviseRequest, service: StoryServiceDep, request: Request) -> OutlineAgentReply:
+    """Send the user's chat message to the outline agent; the revised outline is not saved."""
+    return await cancel_on_disconnect(request, service.revise_outline(body.outline, body.message))
+
+
+@router.get("/outline/revise")
+async def get_outline_revise_history(service: StoryServiceDep) -> list[ChatMessage]:
+    """Return the chat history with the outline agent."""
+    return await service.outline_history()
 
 
 @router.post("/acts/generate")
@@ -55,23 +67,7 @@ async def edit_act(
     return service.edit_act(number, summary, dramatic_function)
 
 
-@router.post("/acts/chat")
-async def revise_act(
-    message: Annotated[str, Body(embed=True, min_length=1)],
-    service: StoryServiceDep,
-    request: Request,
-) -> ChatReply:
-    """Revise the act the user names in the acts chat; stop generating if the client cancels."""
-    return await cancel_on_disconnect(request, service.revise_act(message))
-
-
 @router.post("/acts/approve")
 async def approve_acts(service: StoryServiceDep) -> StoryBible:
     """Approve the acts, so the structure of the first act can be built."""
     return service.approve_acts()
-
-
-@router.get("/chats/{chat_id}")
-async def get_chat(chat_id: str, service: StoryServiceDep) -> Chat:
-    """Return all messages of the chat of a page, e.g. "outline"."""
-    return service.get_chat(chat_id)

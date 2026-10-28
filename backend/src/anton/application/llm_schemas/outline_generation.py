@@ -15,8 +15,15 @@ class GeneratedOutline(BaseModel):
     synopsis: str = Field(description="A few sentences from the beginning to the end of the play, including the ending.")
 
 
-class GeneratedOutlineRevision(BaseModel):
-    """Represent the revised outline and what was changed, as the language model generates them."""
+class OutlineChatTurn(BaseModel):
+    """Represent one answer of the outline agent in the chat."""
 
-    outline: GeneratedOutline
-    change_note: str = Field(description="One short sentence on what was changed and why.")
+    reply: str = Field(
+        description="Your own answer to the playwright's message, in their language. Never repeat or quote their message.",
+    )
+    apply_changes: str | None = Field(
+        description=(
+            "Only right after the playwright agreed to your proposal: the agreed new value of every affected field, "
+            "written in the language of the outline. Otherwise null."
+        ),
+    )

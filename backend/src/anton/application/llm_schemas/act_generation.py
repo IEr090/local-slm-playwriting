@@ -13,11 +13,3 @@ class GeneratedAct(BaseModel):
 class GeneratedActs(RootModel[list[GeneratedAct]]):
     """Represent all acts of the play, in order, as the language model generates them."""
 
-
-class GeneratedActRevision(BaseModel):
-    """Represent the revised act and what was changed, as the language model generates them."""
-
-    act_number: int | None = Field(description="Number of the act the request is about, or null if the request names no act.")
-    summary: str = Field(description="The revised summary of that act.")
-    dramatic_function: DramaticFunction
-    change_note: str = Field(description="One short sentence on what was changed and why.")

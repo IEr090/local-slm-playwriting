@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections import defaultdict
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -13,10 +13,14 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel
 
+from anton.application.agent_chat import ChatMessage, to_chat_messages
 from anton.application.llm_schemas.character_edit import EditChatTurn, EditedCharacter
 from anton.domain.models import Character
 from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
+
+
+NOT_EDITED_FIELDS = {"id", "relationships", "history"}
 
 
 class EditAgentState(TypedDict):
@@ -30,13 +34,6 @@ class EditAgentState(TypedDict):
     pending_reply: str | None
 
 
-class ChatMessage(BaseModel):
-    """Represent one message of the chat with the edit agent."""
-
-    role: Literal["user", "assistant"]
-    content: str
-
-
 class EditAgentReply(BaseModel):
     """Represent the answer of the edit agent and the character as it sees it now."""
 
@@ -45,10 +42,10 @@ class EditAgentReply(BaseModel):
 
 
 async def edit_character(client: SLMClient, character: Character, changes: str) -> Character:
-    """Apply the agreed changes to a character with the model, keeping its id and relationships."""
-    # Relationships hold ids of other characters, which the model could break.
+    """Apply the agreed changes to a character with the model, keeping its id, relationships and history."""
+    # Relationships hold ids of other characters, which the model could break; the history is not part of the profile.
     user_prompt = json.dumps(
-        {"character": character.model_dump(exclude={"id", "relationships"}), "changes": changes},
+        {"character": character.model_dump(exclude=NOT_EDITED_FIELDS), "changes": changes},
         ensure_ascii=False,
     )
     edited = await client.generate(
@@ -57,12 +54,15 @@ async def edit_character(client: SLMClient, character: Character, changes: str) 
         response_model=EditedCharacter,
         think=False,
     )
-    return Character(id=character.id, relationships=character.relationships, **edited.model_dump())
+    return Character(id=character.id, relationships=character.relationships, history=character.history, **edited.model_dump())
 
 
 def create_checkpointer() -> InMemorySaver:
     """Create the in-memory store of conversations that may hold characters in their state."""
-    serde = JsonPlusSerializer(allowed_msgpack_modules=[("anton.domain.models.character", "Character")])
+    serde = JsonPlusSerializer(allowed_msgpack_modules=[
+        ("anton.domain.models.character", "Character"),
+        ("anton.domain.models.character", "CharacterHistoryEntry"),
+    ])
     return InMemorySaver(serde=serde)
 
 
@@ -94,7 +94,7 @@ class EditAgent:
     async def history(self, character_id: str) -> list[ChatMessage]:
         """Return the chat history about the character, or an empty list if there is none."""
         state = await self.graph.aget_state({"configurable": {"thread_id": character_id}})
-        return _to_chat_messages(state.values.get("messages", []))
+        return to_chat_messages(state.values.get("messages", []))
 
     def _build_graph(self, checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
         """Build the graph that chats about a character, applies agreed changes and waits for the user."""
@@ -114,7 +114,7 @@ class EditAgent:
         *history, last = state["messages"]
         user_prompt = json.dumps(
             {
-                "character": state["character"].model_dump(exclude={"id", "relationships"}),
+                "character": state["character"].model_dump(exclude=NOT_EDITED_FIELDS),
                 "history": [
                     {"speaker": "playwright" if isinstance(message, HumanMessage) else "dramaturg", "text": message.content}
                     for message in history
@@ -152,11 +152,3 @@ class EditAgent:
         """Pause until the user answers, then take their message and the character from their form."""
         answer = interrupt(state["messages"][-1].content)
         return {"messages": [HumanMessage(answer["message"])], "character": answer["character"]}
-
-
-def _to_chat_messages(messages: list[AnyMessage]) -> list[ChatMessage]:
-    """Turn the graph messages into chat messages of the user and the assistant."""
-    return [
-        ChatMessage(role="user" if isinstance(message, HumanMessage) else "assistant", content=message.content)
-        for message in messages
-    ]

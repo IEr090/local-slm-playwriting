@@ -4,7 +4,7 @@ from unittest import IsolatedAsyncioTestCase
 
 from anton.application.edit_agent import ChatMessage, EditAgent, create_checkpointer, edit_character
 from anton.application.llm_schemas.character_edit import EditChatTurn, EditedCharacter
-from anton.domain.models import Character, Relationship
+from anton.domain.models import Character, CharacterHistoryEntry, Relationship
 from anton.errors import SLMResponseError
 from tests.unit.fakes import FakeSLMClient, ScriptedSLMClient, make_draft
 
@@ -12,11 +12,15 @@ from tests.unit.fakes import FakeSLMClient, ScriptedSLMClient, make_draft
 CHANGES = "Make her ten years older and more cynical."
 
 
+HISTORY = [CharacterHistoryEntry(act_number=1, scene_number=2, change="Learns about the debt.")]
+
+
 def make_character() -> Character:
-    """Create a saved character with a relationship to another character."""
+    """Create a saved character with a relationship to another character and a history."""
     return Character(
         id="first",
         **(make_draft().model_dump() | {"relationships": [{"character_id": "second", "description": "Rivals."}]}),
+        history=HISTORY,
     )
 
 
@@ -40,7 +44,7 @@ class EditCharacterTest(IsolatedAsyncioTestCase):
         """Replace the profile fields with the ones the model returned."""
         result = await edit_character(self.client, self.character, CHANGES)
 
-        self.assertEqual(result.model_dump(exclude={"id", "relationships"}), self.edited.model_dump())
+        self.assertEqual(result.model_dump(exclude={"id", "relationships", "history"}), self.edited.model_dump())
 
     async def test_keeps_id_and_relationships(self) -> None:
         """Keep the id and the relationships of the original character."""
@@ -49,12 +53,18 @@ class EditCharacterTest(IsolatedAsyncioTestCase):
         self.assertEqual(result.id, "first")
         self.assertEqual(result.relationships, [Relationship(character_id="second", description="Rivals.")])
 
-    async def test_sends_character_without_id_and_relationships(self) -> None:
-        """Pass the profile without the id and the relationships to the model."""
+    async def test_keeps_history(self) -> None:
+        """Keep the history of the original character, which the model never sees."""
+        result = await edit_character(self.client, self.character, CHANGES)
+
+        self.assertEqual(result.history, HISTORY)
+
+    async def test_sends_character_without_id_relationships_and_history(self) -> None:
+        """Pass the profile without the id, the relationships and the history to the model."""
         await edit_character(self.client, self.character, CHANGES)
 
         prompt = json.loads(self.client.calls[0]["user_prompt"])
-        self.assertEqual(prompt["character"], self.character.model_dump(exclude={"id", "relationships"}))
+        self.assertEqual(prompt["character"], self.character.model_dump(exclude={"id", "relationships", "history"}))
 
     async def test_sends_changes(self) -> None:
         """Pass the agreed changes to the model."""
@@ -96,6 +106,7 @@ class EditAgentFirstMessageTest(IsolatedAsyncioTestCase):
         self.assertEqual(result.reply, "Applying.")
         self.assertEqual(result.character.id, "first")
         self.assertEqual(result.character.age, 57)
+        self.assertEqual(result.character.history, HISTORY)
         self.assertEqual(json.loads(self.client.calls[1]["user_prompt"])["changes"], CHANGES)
 
     async def test_resets_changes_after_edit(self) -> None:
@@ -126,13 +137,13 @@ class EditAgentFirstMessageTest(IsolatedAsyncioTestCase):
         self.assertEqual(result.character, make_character())
 
     async def test_sends_character_and_history_to_chat(self) -> None:
-        """Pass the character without id and relationships and the history to the chat prompt."""
+        """Pass the character without id, relationships and character history, and the chat history to the chat prompt."""
         agent = self.make_agent(EditChatTurn(reply="What should change?", apply_changes=None))
 
         await agent.send(make_character(), "Change her.")
 
         prompt = json.loads(self.client.calls[0]["user_prompt"])
-        self.assertEqual(prompt["character"], make_character().model_dump(exclude={"id", "relationships"}))
+        self.assertEqual(prompt["character"], make_character().model_dump(exclude={"id", "relationships", "history"}))
         self.assertEqual(prompt["history"], [])
         self.assertEqual(prompt["playwright_message"], "Change her.")
         self.assertFalse(self.client.calls[0]["think"])
