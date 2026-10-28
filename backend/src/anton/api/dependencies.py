@@ -9,11 +9,14 @@ from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.agents.outline_target import OutlineTarget
 from anton.application.agents.scene_targets import SceneBoard, ScenesTarget, StructureTarget
+from anton.application.agents.text_target import TextTarget
 from anton.application.character_service import CharacterService
 from anton.application.scene_planner import ScenePlanner
 from anton.application.scene_service import SceneService
+from anton.application.scene_writer import SceneWriter
+from anton.application.text_service import TextService
 from anton.application.story_service import StoryService
-from anton.domain.models import ActSummary, Character, Outline
+from anton.domain.models import ActSummary, Character, Outline, SceneText
 from anton.infrastructure.config import Settings
 from anton.infrastructure.slm import SLMClient, create_slm_client
 from anton.infrastructure.storage import CastRepository, JsonCastRepository, JsonStoryRepository, StoryRepository
@@ -118,3 +121,22 @@ def get_scene_service(
 
 
 SceneServiceDep = Annotated[SceneService, Depends(get_scene_service)]
+
+
+@lru_cache
+def get_text_agent() -> ChatEditAgent[list[SceneText]]:
+    """Create one agent that revises the text of an act; it writes into the chat of the act page."""
+    return ChatEditAgent(get_slm_client(), TextTarget(), get_act_checkpointer())
+
+
+def get_text_service(
+    story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
+    cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
+    text_agent: Annotated[ChatEditAgent[list[SceneText]], Depends(get_text_agent)],
+    client: Annotated[SLMClient, Depends(get_slm_client)],
+) -> TextService:
+    """Create the text service with the configured repositories, the text agent and the scene writer."""
+    return TextService(story_repository, cast_repository, text_agent, SceneWriter(client))
+
+
+TextServiceDep = Annotated[TextService, Depends(get_text_service)]

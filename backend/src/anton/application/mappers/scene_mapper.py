@@ -51,7 +51,7 @@ def to_scene_plans(views: list[SceneView], places: list[Place], characters: list
             character_ids=_unique([
                 character_id
                 for name in view.characters
-                if (character_id := _find_character(name, characters))
+                if (character_id := find_character(name, characters))
             ]),
             what_happens=view.what_happens,
         )
@@ -69,7 +69,7 @@ def full_name(character: Character) -> str:
     return f"{character.name} {character.surname}".strip()
 
 
-def _find_character(name: str, characters: list[Character]) -> str:
+def find_character(name: str, characters: list[Character]) -> str:
     """Return the id of the character with this full or first name, or an empty string if it is not clear."""
     key = _normalize(name)
     by_full_name = [character.id for character in characters if _normalize(full_name(character)) == key]

@@ -67,7 +67,7 @@ class SceneService:
         act = _require_structure_draft(story, number)
         cast = self._get_cast()
 
-        board = await self.structure_agent.generate(_thread(number), {
+        board = await self.structure_agent.generate(act_thread(number), {
             "outline": story.outline.model_dump_json(include=OUTLINE_FIELDS, indent=2),
             "act": act.model_dump_json(include={"number", "dramatic_function", "summary"}, indent=2),
             "earlier_acts": _json([item.model_dump(include={"number", "summary"}) for item in story.acts if item.number < number]),
@@ -117,23 +117,14 @@ class SceneService:
         act, scene = self._get_scene_to_plan(story, number, scene_number)
         cast = self._get_cast()
         views = to_scene_views(act.scenes, story.places, cast.characters)
-        place = _find_place(story, scene.place_id)
+        place = find_place(story, scene.place_id)
 
         generated = await self.planner.plan(
             act_summary=act.summary,
             earlier_scenes=views[:scene_number - 1],
             scene=views[scene_number - 1],
             place=place.model_dump(include={"name", "description"}),
-            characters=[
-                character.model_dump(include=PLAN_CHARACTER_FIELDS) | {
-                    "history": [
-                        entry.change for entry in character.history
-                        if (entry.act_number, entry.scene_number) < (number, scene_number)
-                    ],
-                }
-                for character in cast.characters
-                if character.id in scene.character_ids
-            ],
+            characters=on_stage_profiles(cast, scene, number),
         )
 
         story = self._get_story()
@@ -149,7 +140,7 @@ class SceneService:
         """Replace the plan of a scene with the one the user edited by hand; the scene has to be approved again."""
         story = self._get_story()
         act = _require_structure_approved(story, number)
-        scene = _find_scene(act, scene_number)
+        scene = find_scene(act, scene_number)
         self._check_references(story, [plan])
         for field, value in plan.model_dump().items():
             setattr(scene, field, value)
@@ -167,7 +158,7 @@ class SceneService:
         """Approve the plan of a scene; when the last scene is approved, the act's scenes are approved."""
         story = self._get_story()
         act = _require_structure_approved(story, number)
-        scene = _find_scene(act, scene_number)
+        scene = find_scene(act, scene_number)
         if not scene.planned:
             raise StoryOrderError(f"Scene {scene_number} has no plan yet.")
         scene.status = "approved"
@@ -180,19 +171,19 @@ class SceneService:
         """Take back the approval of a scene, so it can be changed again."""
         story = self._get_story()
         act = _require_structure_approved(story, number)
-        _reopen(act, _find_scene(act, scene_number))
+        _reopen(act, find_scene(act, scene_number))
         self.story_repository.save(story)
         return story
 
     async def act_chat(self, number: int) -> list[ChatMessage]:
         """Return the chat history of the act page; both agents write into the same conversation."""
-        return await self.structure_agent.history(_thread(number))
+        return await self.structure_agent.history(act_thread(number))
 
     async def forget_act_chats(self) -> None:
         """Forget the chats of every act page, e.g. when a new play is started."""
         story = self.story_repository.load()
         for act in story.acts if story is not None else []:
-            await self.structure_agent.forget(_thread(act.number))
+            await self.structure_agent.forget(act_thread(act.number))
 
     async def _revise(
         self, agent: ChatEditAgent[SceneBoard], story: StoryBible, act: Act, plans: list[ScenePlan], message: str,
@@ -202,7 +193,7 @@ class SceneService:
         cast = self._get_cast()
         board = SceneBoard(scenes=to_scene_views(plans, story.places, cast.characters))
 
-        result = await agent.send(_thread(act.number), board, message, context={
+        result = await agent.send(act_thread(act.number), board, message, context={
             "act_summary": act.summary,
             "places": [place.model_dump(include={"name", "description"}) for place in story.places],
             "characters": [full_name(character) for character in cast.characters],
@@ -222,7 +213,7 @@ class SceneService:
     def _get_scene_to_plan(self, story: StoryBible, number: int, scene_number: int) -> tuple[Act, Scene]:
         """Return the act and the scene to plan and make sure the scene before it is approved."""
         act = _require_structure_approved(story, number)
-        scene = _find_scene(act, scene_number)
+        scene = find_scene(act, scene_number)
         if scene.status == "approved":
             raise StoryOrderError(f"Scene {scene_number} is approved. Reopen it to plan it again.")
         if scene_number > 1 and act.scenes[scene_number - 2].status != "approved":
@@ -255,7 +246,7 @@ class SceneService:
         return cast
 
 
-def _require_open_act(story: StoryBible, number: int) -> Act:
+def require_open_act(story: StoryBible, number: int) -> Act:
     """Return the act once the acts are approved and the text of the act before it is approved."""
     if not story.acts_approved:
         raise StoryOrderError("Approve the acts before working on their scenes.")
@@ -267,7 +258,7 @@ def _require_open_act(story: StoryBible, number: int) -> Act:
 
 def _require_structure_draft(story: StoryBible, number: int) -> Act:
     """Return the act while its structure can still be changed."""
-    act = _require_open_act(story, number)
+    act = require_open_act(story, number)
     if act.status != "draft":
         raise StoryOrderError(f"The structure of Act {number} is already approved.")
     return act
@@ -275,7 +266,7 @@ def _require_structure_draft(story: StoryBible, number: int) -> Act:
 
 def _require_structure_approved(story: StoryBible, number: int) -> Act:
     """Return the act once its structure is approved, so its scenes can be planned."""
-    act = _require_open_act(story, number)
+    act = require_open_act(story, number)
     if act.status == "draft":
         raise StoryOrderError(f"Approve the structure of Act {number} first.")
     return act
@@ -287,7 +278,7 @@ def _reopen(act: Act, scene: Scene) -> None:
     act.status = "structure_approved"
 
 
-def _find_scene(act: Act, scene_number: int) -> Scene:
+def find_scene(act: Act, scene_number: int) -> Scene:
     """Return the scene with the given number."""
     for scene in act.scenes:
         if scene.number == scene_number:
@@ -295,7 +286,7 @@ def _find_scene(act: Act, scene_number: int) -> Scene:
     raise SceneNotFoundError(f"Scene {scene_number} is not in Act {act.number}.")
 
 
-def _find_place(story: StoryBible, place_id: str) -> Place:
+def find_place(story: StoryBible, place_id: str) -> Place:
     """Return the place with the given id."""
     for place in story.places:
         if place.id == place_id:
@@ -303,7 +294,21 @@ def _find_place(story: StoryBible, place_id: str) -> Place:
     raise PlaceNotFoundError(f"Place {place_id} is not in the Story Bible.")
 
 
-def _thread(number: int) -> str:
+def on_stage_profiles(cast: Cast, scene: Scene, act_number: int) -> list[dict]:
+    """Return the profiles of the characters on stage with what changed for them before this scene."""
+    return [
+        character.model_dump(include=PLAN_CHARACTER_FIELDS) | {
+            "history": [
+                entry.change for entry in character.history
+                if (entry.act_number, entry.scene_number) < (act_number, scene.number)
+            ],
+        }
+        for character in cast.characters
+        if character.id in scene.character_ids
+    ]
+
+
+def act_thread(number: int) -> str:
     """Return the id of the conversation of an act page."""
     return f"act-{number}"
 

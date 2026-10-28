@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from anton.api.dependencies import SceneServiceDep
+from anton.api.dependencies import SceneServiceDep, TextServiceDep
 from anton.api.disconnect import cancel_on_disconnect
 from anton.application.agents.chat_edit_agent import ChatMessage
 from anton.application.scene_service import SceneRevision
-from anton.domain.models import Place, PlaceDraft, ScenePlan, StoryBible
+from anton.application.text_service import TextRevision
+from anton.domain.models import Place, PlaceDraft, ScenePlan, SceneText, StoryBible
 
 
 router = APIRouter(prefix="/story", tags=["acts"])
@@ -16,6 +17,13 @@ class ScenesReviseRequest(BaseModel):
 
     message: str = Field(min_length=1)
     scenes: list[ScenePlan] = Field(min_length=1)
+
+
+class TextReviseRequest(BaseModel):
+    """Represent a chat message about the text of the act together with the scene texts from the user's form."""
+
+    message: str = Field(min_length=1)
+    scene_texts: list[SceneText] = Field(min_length=1)
 
 
 @router.get("/places")
@@ -82,6 +90,30 @@ async def approve_scene(number: int, scene_number: int, service: SceneServiceDep
 async def reopen_scene(number: int, scene_number: int, service: SceneServiceDep) -> StoryBible:
     """Take back the approval of a scene."""
     return service.reopen_scene(number, scene_number)
+
+
+@router.post("/acts/{number}/text/generate")
+async def generate_text(number: int, service: TextServiceDep, request: Request) -> StoryBible:
+    """Write the text of the act scene by scene; stop generating if the client cancels."""
+    return await cancel_on_disconnect(request, service.generate_text(number))
+
+
+@router.put("/acts/{number}/text")
+async def edit_text(number: int, scene_texts: list[SceneText], service: TextServiceDep) -> StoryBible:
+    """Save the scene texts the user took over from the chat."""
+    return service.edit_text(number, scene_texts)
+
+
+@router.post("/acts/{number}/text/revise")
+async def revise_text(number: int, body: TextReviseRequest, service: TextServiceDep, request: Request) -> TextRevision:
+    """Send the user's chat message about the text to the act agent; nothing is saved."""
+    return await cancel_on_disconnect(request, service.revise_text(number, body.scene_texts, body.message))
+
+
+@router.post("/acts/{number}/text/approve")
+async def approve_text(number: int, service: TextServiceDep, request: Request) -> StoryBible:
+    """Approve the text and record what it changed for the characters; stop if the client cancels."""
+    return await cancel_on_disconnect(request, service.approve_text(number))
 
 
 @router.get("/acts/{number}/chat")

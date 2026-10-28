@@ -29,6 +29,7 @@ STATE_MODELS = [
     ("anton.domain.models.story", "Outline"),
     ("anton.domain.models.story", "ActSummary"),
     ("anton.domain.models.story", "PlaceDraft"),
+    ("anton.domain.models.story", "SceneText"),
     ("anton.application.agents.scene_targets", "SceneBoard"),
     ("anton.application.agents.scene_targets", "SceneView"),
 ]

@@ -2,9 +2,11 @@ from unittest import TestCase
 
 from fastapi.testclient import TestClient
 
-from anton.api.dependencies import get_scene_service
+from anton.api.dependencies import get_scene_service, get_text_service
 from anton.main import app
 from tests.unit.test_scene_service import KITCHEN, PLAN, PROPOSAL, STRUCTURE, make_scene, make_service, make_story
+from tests.unit.test_text_service import HISTORY, SCENE_TEXT, make_text_story
+from tests.unit.test_text_service import make_service as make_text_service
 
 
 class ActRouteTest(TestCase):
@@ -87,3 +89,45 @@ class ActRouteTest(TestCase):
 
         self.assertEqual([place["name"] for place in response.json()], ["The keeper's kitchen", "The landing"])
         self.assertTrue(created["id"])
+
+
+class TextRouteTest(TestCase):
+    """Test the endpoints of the act text, from writing it to recording the character histories."""
+
+    def setUp(self) -> None:
+        """Replace the text service with one that uses a fake model client and in-memory repositories."""
+        self.service, _, self.repository, self.cast_repository = make_text_service(
+            SCENE_TEXT, HISTORY, story=make_text_story(texts=False),
+        )
+        app.dependency_overrides[get_text_service] = lambda: self.service
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        """Remove the dependency override."""
+        app.dependency_overrides.clear()
+
+    def test_writes_and_approves_text(self) -> None:
+        """Write the text, approve it and append the character histories."""
+        written = self.client.post("/api/story/acts/1/text/generate").json()
+        self.assertTrue(written["acts"][0]["text"].startswith("SCENE 1"))
+
+        approved = self.client.post("/api/story/acts/1/text/approve").json()
+
+        self.assertEqual(approved["acts"][0]["status"], "text_approved")
+        self.assertEqual(len(self.cast_repository.load().characters[1].history), 2)
+
+    def test_approve_before_text_returns_409(self) -> None:
+        """Reject approving before the text is written."""
+        response = self.client.post("/api/story/acts/1/text/approve")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("has not been written", response.json()["message"])
+
+    def test_saves_text_from_form(self) -> None:
+        """Save the scene texts the user took over."""
+        self.client.post("/api/story/acts/1/text/generate")
+        texts = [{"scene_number": 1, "text": "ELIAS: Changed."}, {"scene_number": 2, "text": "ELIAS: Two."}]
+
+        response = self.client.put("/api/story/acts/1/text", json=texts)
+
+        self.assertEqual(response.json()["acts"][0]["scene_texts"], texts)
