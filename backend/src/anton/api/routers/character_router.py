@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Request
 from pydantic import BaseModel, Field
 
-from anton.api.dependencies import CharacterServiceDep, EditAgentDep
+from anton.api.dependencies import CharacterServiceDep, EditAgentDep, StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
 from anton.application.edit_agent import ChatMessage, EditAgentReply
 from anton.domain.models import Cast, Character, CharacterDraft, CharacterWithCard
@@ -23,10 +23,16 @@ class ReviseRequest(BaseModel):
 async def generate_cast(
     premise: Annotated[str, Body(embed=True, min_length=1)],
     service: CharacterServiceDep,
+    story_service: StoryServiceDep,
     request: Request,
 ) -> Cast:
-    """Generate the whole cast with cards from a premise; stop generating if the client cancels."""
-    return await cancel_on_disconnect(request, service.generate_cast(premise))
+    """Generate the whole cast with cards from a premise; stop generating if the client cancels.
+
+    The premise is the user's initial input, so a new Story Bible is started from it.
+    """
+    cast = await cancel_on_disconnect(request, service.generate_cast(premise))
+    story_service.start_play(premise)
+    return cast
 
 
 @router.get("")

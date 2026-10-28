@@ -13,3 +13,7 @@ class ChatRepository(Protocol):
     def save(self, chat: Chat) -> None:
         """Replace the saved chat with the same id by the given one."""
         ...
+
+    def clear(self) -> None:
+        """Remove all saved chats, e.g. when a new play is started."""
+        ...

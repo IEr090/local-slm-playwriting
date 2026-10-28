@@ -26,6 +26,10 @@ class JsonChatRepository:
         chats[chat.id] = chat
         write_atomically(self.path, CHATS.dump_json(chats, indent=2).decode("utf-8"))
 
+    def clear(self) -> None:
+        """Remove all saved chats."""
+        self.path.unlink(missing_ok=True)
+
     def _load_all(self) -> dict[str, Chat]:
         """Return all saved chats, or none if the file does not exist yet."""
         if not self.path.exists():

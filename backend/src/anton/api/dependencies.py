@@ -5,6 +5,7 @@ from fastapi import Depends
 
 from anton.application.character_service import CharacterService
 from anton.application.edit_agent import EditAgent, create_checkpointer
+from anton.application.story_service import StoryService
 from anton.infrastructure.config import Settings
 from anton.infrastructure.slm import SLMClient, create_slm_client
 from anton.infrastructure.storage import (
@@ -65,3 +66,16 @@ def get_edit_agent() -> EditAgent:
 
 
 EditAgentDep = Annotated[EditAgent, Depends(get_edit_agent)]
+
+
+def get_story_service(
+    client: Annotated[SLMClient, Depends(get_slm_client)],
+    story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
+    cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
+    chat_repository: Annotated[ChatRepository, Depends(get_chat_repository)],
+) -> StoryService:
+    """Create the story service with the configured SLM client and repositories."""
+    return StoryService(client, story_repository, cast_repository, chat_repository)
+
+
+StoryServiceDep = Annotated[StoryService, Depends(get_story_service)]

@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from anton.domain.models.story import StoryBible
+
 
 ChatRole = Literal["user", "assistant"]
 ChatDecision = Literal["revised", "added", "which_act", "which_scene", "noted"]
@@ -22,3 +24,10 @@ class Chat(BaseModel):
 
     id: str
     messages: list[ChatMessage] = []
+
+
+class ChatReply(BaseModel):
+    """Represent the answer of a chat together with the Story Bible it changed."""
+
+    story: StoryBible
+    reply: ChatMessage

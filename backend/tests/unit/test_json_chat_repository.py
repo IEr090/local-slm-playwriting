@@ -67,3 +67,12 @@ class JsonChatRepositoryTest(TestCase):
         self.repository.save(make_chat("outline", "Make the ending darker."))
 
         self.assertEqual([path.name for path in self.path.parent.iterdir()], ["chats.json"])
+
+    def test_clear_removes_all_chats(self) -> None:
+        """Return empty chats after clearing, also when nothing was saved before."""
+        self.repository.clear()
+        self.repository.save(make_chat("outline", "Make the ending darker."))
+
+        self.repository.clear()
+
+        self.assertEqual(self.repository.load("outline"), Chat(id="outline"))

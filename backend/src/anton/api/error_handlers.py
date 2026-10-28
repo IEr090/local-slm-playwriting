@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from anton.api.disconnect import ClientDisconnectedError
-from anton.errors import NotFoundError, SLMResponseError, SLMUnavailableError
+from anton.errors import NotFoundError, SLMResponseError, SLMUnavailableError, StoryNotFoundError, StoryOrderError
 
 
 def add_error_handlers(app: FastAPI) -> None:
@@ -14,6 +14,22 @@ def add_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=404,
             content={"message": "Nothing found. Generate or create characters first.", "detail": str(error)},
+        )
+
+    @app.exception_handler(StoryNotFoundError)
+    async def story_not_found(request: Request, error: StoryNotFoundError) -> JSONResponse:
+        """Answer 404 when no play has been started yet."""
+        return JSONResponse(
+            status_code=404,
+            content={"message": "No play yet. Generate the characters first.", "detail": str(error)},
+        )
+
+    @app.exception_handler(StoryOrderError)
+    async def story_order(request: Request, error: StoryOrderError) -> JSONResponse:
+        """Answer 409 when a step is asked for before the steps it builds on are done."""
+        return JSONResponse(
+            status_code=409,
+            content={"message": str(error), "detail": type(error).__name__},
         )
 
     @app.exception_handler(ClientDisconnectedError)

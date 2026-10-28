@@ -148,3 +148,7 @@ class InMemoryChatRepository:
     def save(self, chat: Chat) -> None:
         """Keep a copy of the chat."""
         self.chats[chat.id] = chat.model_copy(deep=True)
+
+    def clear(self) -> None:
+        """Remove all chats."""
+        self.chats = {}
