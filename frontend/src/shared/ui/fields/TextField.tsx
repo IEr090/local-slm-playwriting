@@ -12,11 +12,12 @@ interface TextFieldProps {
   invalid?: boolean;
   /** Dotted underline, for a field that shares its card with something else and would not look editable. */
   lined?: boolean;
+  readOnly?: boolean;
   className?: string;
 }
 
 /** Borderless textarea (`.txt`) that grows with its content. */
-export function TextField({ value, onChange, rows, label, placeholder, invalid, lined, className }: TextFieldProps) {
+export function TextField({ value, onChange, rows, label, placeholder, invalid, lined, readOnly, className }: TextFieldProps) {
   const ref = useAutoGrow(value);
   return (
     <textarea
@@ -26,6 +27,7 @@ export function TextField({ value, onChange, rows, label, placeholder, invalid, 
       aria-label={label}
       aria-invalid={invalid || undefined}
       placeholder={placeholder}
+      readOnly={readOnly}
       onChange={(e) => onChange(e.target.value)}
       className={cn(
         "m-0 box-border block w-full resize-none overflow-hidden border-none bg-transparent p-0 font-sans text-[13px] leading-[1.55] text-ink placeholder:text-placeholder focus:outline-none",

@@ -3,7 +3,7 @@ import { relationOptions } from "@/features/characters/model/relationships";
 import { fullName } from "@/features/characters/model/text";
 import type { Character, CharacterCard, Relationship } from "@/features/characters/model/types";
 import { CharacterCombobox } from "./CharacterCombobox";
-import { TextField } from "./TextField";
+import { TextField } from "@/shared/ui/fields/TextField";
 
 interface RelationshipsFieldProps {
   selfId: string;

@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
+import { UpdatingOverlay } from "./UpdatingOverlay";
 
 interface FieldCardProps {
   num: number;
@@ -13,18 +14,20 @@ interface FieldCardProps {
   highlighted?: boolean;
   /** Red border: a required field left empty after CREATE / SAVE was pressed. */
   invalid?: boolean;
+  /** "UPDATING" overlay while the AI is about to rewrite this field. */
+  updating?: boolean;
   className?: string;
   children: ReactNode;
 }
 
 /** A field card (`.fcard`): gold border while focused, stretches with its grid row. */
-export function FieldCard({ num, label, hint, compact, highlighted, invalid, className, children }: FieldCardProps) {
+export function FieldCard({ num, label, hint, compact, highlighted, invalid, updating = false, className, children }: FieldCardProps) {
   return (
     <motion.div
       layout="position"
       transition={{ duration: 0.25, ease: "easeOut" }}
       className={cn(
-        "box-border flex min-w-0 flex-col rounded-[10px] border border-line bg-card transition-[border-color,background-color,box-shadow] duration-200",
+        "relative box-border flex min-w-0 flex-col rounded-[10px] border border-line bg-card transition-[border-color,background-color,box-shadow] duration-200",
         "hover:border-line-hover focus-within:border-gold focus-within:bg-card-focus",
         compact ? "gap-1 px-[14px] py-[10px]" : "gap-[10px] px-[18px] pt-[14px] pb-4",
         highlighted && "shadow-[0_0_0_1px_#c9a24b,0_0_24px_#c9a24b44]",
@@ -38,6 +41,18 @@ export function FieldCard({ num, label, hint, compact, highlighted, invalid, cla
         {hint && <span className="ml-auto font-sans text-[10px] tracking-[1.5px] text-faint">{hint}</span>}
       </div>
       {children}
+      <UpdatingOverlay show={updating} />
     </motion.div>
+  );
+}
+
+/** "I  BASIC PROFILE ·······" heading of a field card grid section. */
+export function SectionHeading({ numeral, title, className = "" }: { numeral?: string; title: string; className?: string }) {
+  return (
+    <div className={cn("col-span-4 mt-[6px] mb-[2px] flex items-center gap-[14px]", className)}>
+      {numeral && <span className="font-serif text-xl text-gold italic">{numeral}</span>}
+      <span className="font-sans text-[11px] tracking-[3px] text-ink-2">{title}</span>
+      <span className="dotted-rule flex-1" />
+    </div>
   );
 }

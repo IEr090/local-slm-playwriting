@@ -1,13 +1,14 @@
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowRight, Spark } from "@/shared/ui/icons";
-import type { ChatMessage as Message } from "@/features/characters/model/types";
-import { ChatMessage, TypingIndicator } from "./ChatMessage";
+import { ChatMessage, TypingIndicator, type ChatBubble } from "./ChatMessage";
 
 interface ChatPanelProps {
   open: boolean;
-  characterName: string;
-  messages: Message[];
+  /** Shown while the chat is empty: what the agent can do, with an example. */
+  intro: ReactNode;
+  placeholder?: string;
+  messages: ChatBubble[];
   typing: boolean;
   draft: string;
   onDraftChange(draft: string): void;
@@ -15,7 +16,16 @@ interface ChatPanelProps {
 }
 
 /** "ASK AI TO REVISE" panel on the right; width animates 400 ↔ 0. */
-export function ChatPanel({ open, characterName, messages, typing, draft, onDraftChange, onSend }: ChatPanelProps) {
+export function ChatPanel({
+  open,
+  intro,
+  placeholder = "Describe what to change…",
+  messages,
+  typing,
+  draft,
+  onDraftChange,
+  onSend,
+}: ChatPanelProps) {
   const scroller = useRef<HTMLDivElement>(null);
 
   // keep the newest message in view
@@ -47,12 +57,7 @@ export function ChatPanel({ open, characterName, messages, typing, draft, onDraf
         <div className="my-5 border-t border-dotted border-line" />
 
         <div ref={scroller} className="scroll-thin flex flex-1 flex-col gap-[14px] overflow-y-auto">
-          {messages.length === 0 && !typing && (
-            <div className="font-sans text-[13px] leading-[1.6] text-faint">
-              Describe what should change about {characterName}, for example “make her more cynical” or “give him a
-              secret”. The Character Agent will rewrite the relevant fields.
-            </div>
-          )}
+          {messages.length === 0 && !typing && <div className="font-sans text-[13px] leading-[1.6] text-faint">{intro}</div>}
           {messages.map((message, i) => (
             <ChatMessage key={i} message={message} />
           ))}
@@ -60,7 +65,7 @@ export function ChatPanel({ open, characterName, messages, typing, draft, onDraf
         </div>
 
         <form
-          className="mt-4 flex items-center gap-[10px] rounded-[12px] border border-line py-[6px] pr-[6px] pl-4"
+          className="mt-4 flex items-center gap-[10px] rounded-[12px] border border-line py-[6px] pr-[6px] pl-4 transition-colors focus-within:border-line-hover"
           onSubmit={(e) => {
             e.preventDefault();
             onSend();
@@ -73,7 +78,7 @@ export function ChatPanel({ open, characterName, messages, typing, draft, onDraf
             id="ai-input"
             value={draft}
             onChange={(e) => onDraftChange(e.target.value)}
-            placeholder="Describe what to change…"
+            placeholder={placeholder}
             autoComplete="off"
             className="flex-1 border-none bg-transparent py-2 font-sans text-[13px] text-ink placeholder:text-faint focus:outline-none"
           />

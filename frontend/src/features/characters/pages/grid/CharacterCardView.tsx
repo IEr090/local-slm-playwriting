@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { fullName } from "@/features/characters/model/text";
-import { CardUpdatingOverlay } from "./CardUpdatingOverlay";
+import { UpdatingOverlay } from "@/shared/ui/UpdatingOverlay";
 import { roleLabel } from "@/features/characters/model/labels";
 import type { Character, CharacterCard } from "@/features/characters/model/types";
 
@@ -54,7 +54,7 @@ export function CharacterCardView({ character, card, number, saving = false, upd
         <CardLine label="FEARS" text={card.fears} />
       </span>
 
-      <CardUpdatingOverlay show={updating} />
+      <UpdatingOverlay show={updating} label="UPDATING CARD" orb />
     </motion.button>
   );
 }

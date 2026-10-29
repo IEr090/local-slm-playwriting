@@ -54,6 +54,7 @@
     --animate-dots: dots 1.2s ease-in-out infinite;
     --animate-shimmer: shimmer 2.2s linear infinite;
     --animate-fade-up: fade-up 0.6s ease-out both;
+    --animate-veil-glow: veil-glow 3.2s ease-in-out infinite;
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     @keyframes spin-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
@@ -64,6 +65,7 @@
     @keyframes twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
     @keyframes dots { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
     @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes veil-glow { 0%, 100% { box-shadow: 0 0 6px #c9a24b26; } 50% { box-shadow: 0 0 18px #c9a24b66; } }
     @keyframes fade-up { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: translateY(0); } }
 }
 
@@ -146,4 +148,41 @@
   }
 
   .orb-core { background: radial-gradient(circle, #1f1910 0%, #0b0a08 80%); }
+}
+
+/* ---------- Story Bible: one column slides aside, the next one comes in from the right ---------- */
+@layer components {
+  .split { flex: 1; min-height: 0; display: flex; position: relative; }
+  .split-side {
+    flex: 0 0 100%; position: relative; overflow: hidden; border-right: 1px dotted transparent;
+    transition: flex-basis .75s cubic-bezier(.4,0,.2,1), border-color .5s ease .3s;
+  }
+  .split-on .split-side { flex-basis: var(--split-width, 340px); border-right-color: var(--color-line-strong); }
+  .split-full {
+    position: absolute; inset: 0; overflow-y: auto; transform-origin: 0 0;
+    transition: opacity .45s ease-out .25s, transform .6s cubic-bezier(.4,0,.2,1) .2s, visibility 0s 0s;
+  }
+  .split-on .split-full {
+    opacity: 0; transform: translateX(-80px) scale(.92); visibility: hidden; pointer-events: none;
+    transition: opacity .3s ease-out, transform .6s cubic-bezier(.4,0,.2,1), visibility 0s .6s;
+  }
+  .split-mini {
+    position: absolute; inset: 0; overflow-y: auto; opacity: 0; transform: translateX(-18px); visibility: hidden;
+    transition: opacity .25s ease-out, transform .25s ease-out, visibility 0s .25s;
+  }
+  .split-on .split-mini {
+    opacity: 1; transform: none; visibility: visible;
+    transition: opacity .5s ease-out .5s, transform .5s ease-out .5s, visibility 0s .5s;
+  }
+  .split-main { flex: 1 1 0; min-width: 0; overflow: hidden; opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
+  .split-on .split-main { overflow-y: auto; opacity: 1; visibility: visible; transition: opacity .45s ease-out .35s, visibility 0s .35s; }
+
+  /* act cards slide in one after another */
+  .slide-in { opacity: 0; transform: translateX(40px); transition: opacity .5s ease-out, transform .55s ease-out; }
+  .split-on .slide-in { opacity: 1; transform: none; }
+  .split-on .slide-in:nth-child(1) { transition-delay: .45s; }
+  .split-on .slide-in:nth-child(2) { transition-delay: .55s; }
+  .split-on .slide-in:nth-child(3) { transition-delay: .65s; }
+  .split-on .slide-in:nth-child(4) { transition-delay: .75s; }
+  .split-on .slide-in:nth-child(5) { transition-delay: .85s; }
 }

@@ -40,3 +40,13 @@ export const Alert = ({ size = 18, className }: IconProps) => (
     <circle cx="12" cy="16.3" r=".6" fill="currentColor" />
   </svg>
 );
+export const ArrowUp = ({ size = 12, className }: IconProps) => (
+  <svg {...base(size)} strokeWidth={1.6} className={className}><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+);
+export const ArrowDown = ({ size = 12, className }: IconProps) => (
+  <svg {...base(size)} strokeWidth={1.6} className={className}><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+);
+/** Small pen for "edit this scene". */
+export const Pen = ({ size = 12, className }: IconProps) => (
+  <svg {...base(size)} strokeWidth={1.6} className={className}><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>
+);
