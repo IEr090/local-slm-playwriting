@@ -15,14 +15,21 @@ class GeneratedSceneText(BaseModel):
     lines: list[GeneratedLine] = Field(description="The scene from beginning to end. Start with a stage direction that sets the scene.")
 
 
-class EditedSceneText(GeneratedSceneText):
-    """Represent one scene text after the agreed changes, as the language model returns it."""
+class LineEdit(BaseModel):
+    """Represent one agreed change of a scene text: a line and the lines that take its place."""
 
     scene_number: int = Field(description="Number of the scene, exactly as in the input.")
+    old_line: str = Field(
+        description="The line to change, copied exactly from the scene text, e.g. 'MARGIT: Of course you didn't.'. "
+        "Empty string to add the new lines at the end of the scene.",
+    )
+    new_lines: list[GeneratedLine] = Field(description="The lines that take the place of the old line, in order. Empty to cut the line.")
 
 
-class EditedSceneTexts(RootModel[list[EditedSceneText]]):
-    """Represent only the scene texts the agreed changes are about."""
+# A small model that has to rewrite a whole scene often returns only the lines it changed and the rest of the
+# scene is lost, so it returns only the edits and every other line stays as it is.
+class EditedSceneTexts(RootModel[list[LineEdit]]):
+    """Represent the agreed changes of the scene texts, one edit per changed line."""
 
 
 class GeneratedHistoryEntry(BaseModel):

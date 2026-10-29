@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
@@ -40,6 +41,11 @@ def get_cast_repository() -> CastRepository:
     return JsonCastRepository(get_settings().data_dir / "cast.json")
 
 
+def chat_file(name: str) -> Path:
+    """Return the file in the configured data directory that keeps one store of conversations."""
+    return get_settings().data_dir / "chats" / f"{name}.pickle"
+
+
 @lru_cache
 def get_story_repository() -> StoryRepository:
     """Create one Story Bible repository in the configured data directory for the whole application."""
@@ -59,8 +65,8 @@ CharacterServiceDep = Annotated[CharacterService, Depends(get_character_service)
 
 @lru_cache
 def get_edit_agent() -> ChatEditAgent[Character]:
-    """Create one agent that edits characters, with an in-memory store of conversations, for the whole application."""
-    return ChatEditAgent(get_slm_client(), CharacterTarget(), create_checkpointer())
+    """Create one agent that edits characters, with a saved store of conversations, for the whole application."""
+    return ChatEditAgent(get_slm_client(), CharacterTarget(), create_checkpointer(chat_file("characters")))
 
 
 EditAgentDep = Annotated[ChatEditAgent[Character], Depends(get_edit_agent)]
@@ -68,14 +74,14 @@ EditAgentDep = Annotated[ChatEditAgent[Character], Depends(get_edit_agent)]
 
 @lru_cache
 def get_outline_agent() -> ChatEditAgent[Outline]:
-    """Create one agent that writes and edits the outline, with an in-memory store of its conversation."""
-    return ChatEditAgent(get_slm_client(), OutlineTarget(), create_checkpointer())
+    """Create one agent that writes and edits the outline, with a saved store of its conversation."""
+    return ChatEditAgent(get_slm_client(), OutlineTarget(), create_checkpointer(chat_file("outline")))
 
 
 @lru_cache
 def get_acts_agent() -> ChatEditAgent[list[ActSummary]]:
-    """Create one agent that writes and edits the acts, with an in-memory store of its conversation."""
-    return ChatEditAgent(get_slm_client(), ActsTarget(), create_checkpointer())
+    """Create one agent that writes and edits the acts, with a saved store of its conversation."""
+    return ChatEditAgent(get_slm_client(), ActsTarget(), create_checkpointer(chat_file("acts")))
 
 
 def get_story_service(
@@ -93,8 +99,8 @@ StoryServiceDep = Annotated[StoryService, Depends(get_story_service)]
 
 @lru_cache
 def get_act_checkpointer() -> InMemorySaver:
-    """Create one store of the act page conversations, shared by both agents of the page."""
-    return create_checkpointer()
+    """Create one saved store of the act page conversations, shared by every agent of the page."""
+    return create_checkpointer(chat_file("acts-pages"))
 
 
 @lru_cache

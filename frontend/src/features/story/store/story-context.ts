@@ -22,7 +22,7 @@ export interface StoryActions {
   sendMessage(context: ChatContext): Promise<void>;
 
   // ---------- outline ----------
-  /** Writes the outline again after a failed generation. */
+  /** Writes the outline (again), until the acts are drafted from it. */
   generateOutline(): void;
   editOutline(patch: Partial<Outline>): void;
   /** APPROVE OUTLINE: saves the outline, shows the acts and drafts them; the outline is final from then on. */
@@ -31,9 +31,11 @@ export interface StoryActions {
   // ---------- acts ----------
   /** Only before the acts are approved. */
   editActSummary(n: number, summary: string): void;
+  /** Drafts the acts again, before they are approved. */
+  redraftActs(): void;
   /** APPROVE ACTS: the summaries are final and the first act is then staged on its own. */
   approveActs(): void;
-  /** Generates the structure of an act again after a failed attempt. */
+  /** Generates the structure of an act (again), while it is a draft. */
   stageAct(n: number): void;
   openAct(n: number): void;
   goToPlay(): void;
@@ -57,7 +59,8 @@ export interface StoryActions {
   // ---------- one act: text ----------
   /** WRITE ACT N: starts writing and goes to the play page, where the act's card shows the progress. */
   writeText(n: number): void;
-  editSceneText(n: number, scene: number, block: number, value: string): void;
+  /** The whole new text of one scene, after a line was changed, added or cut by hand. */
+  editSceneText(n: number, scene: number, text: string): void;
   approveText(n: number): void;
 }
 

@@ -2,7 +2,7 @@ import json
 
 from anton.application.agents.scene_targets import SceneView
 from anton.application.llm_schemas.text_generation import GeneratedHistory, GeneratedSceneText
-from anton.application.mappers.text_mapper import format_lines
+from anton.application.mappers.text_mapper import format_lines, unknown_speakers
 from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
 
@@ -35,13 +35,25 @@ class SceneWriter:
             },
             ensure_ascii=False,
         )
-        generated = await self.client.generate(
+        generated = await self._write(user_prompt)
+        strangers = unknown_speakers(generated.lines, characters)
+        if strangers:
+            # A small model sometimes lets someone speak who is not on stage; it gets one more try with the names.
+            names = ", ".join(f"{c.get('name', '')} {c.get('surname', '')}".strip() for c in characters)
+            correction = f"{user_prompt}\n\nOnly these characters may speak: {names}. Do not let {', '.join(strangers)} speak."
+            retried = await self._write(correction)
+            if len(unknown_speakers(retried.lines, characters)) < len(strangers):
+                generated = retried
+        return format_lines(generated.lines)
+
+    async def _write(self, user_prompt: str) -> GeneratedSceneText:
+        """Ask the model for the lines of a scene."""
+        return await self.client.generate(
             system_prompt=load_prompt("scene_text.md"),
             user_prompt=user_prompt,
             response_model=GeneratedSceneText,
             think=True,
         )
-        return format_lines(generated.lines)
 
     async def extract_history(self, scene_text: str, characters: list[str]) -> GeneratedHistory:
         """Find out what the scene changed for each character on stage."""

@@ -46,9 +46,9 @@ class StoryService:
         return story
 
     async def generate_outline(self) -> StoryBible:
-        """Generate the outline of the whole play from the user's initial input and the cast."""
+        """Generate the outline of the whole play from the user's initial input and the cast; again until the acts exist."""
         story = self.get_story()
-        _require_no_outline(story)
+        _require_outline_open(story)
 
         outline = await self.outline_agent.generate(
             OUTLINE_THREAD, {"idea": story.user_input, "cast": cast_json(self._get_cast(), OUTLINE_CAST_FIELDS)},
@@ -56,7 +56,7 @@ class StoryService:
 
         # Another request may have saved the Story Bible while the outline was generated.
         story = self.get_story()
-        _require_no_outline(story)
+        _require_outline_open(story)
         story.outline = outline
         self.story_repository.save(story)
         return story
@@ -141,10 +141,10 @@ class StoryService:
         return cast
 
 
-def _require_no_outline(story: StoryBible) -> None:
-    """Reject generating the outline a second time; it can only be edited or revised."""
-    if story.outline is not None:
-        raise StoryOrderError("The outline already exists. Edit it or ask the agent to revise it.")
+def _require_outline_open(story: StoryBible) -> None:
+    """Reject writing the outline again once the acts are built from it; until then it can be written anew."""
+    if story.acts:
+        raise StoryOrderError("The acts are already built from the outline. Edit the outline or ask the agent to revise it.")
 
 
 def _require_acts_not_approved(story: StoryBible) -> None:

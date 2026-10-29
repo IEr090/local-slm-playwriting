@@ -22,6 +22,8 @@ interface ScenePlanCardProps {
   onCreatePlace(draft: PlaceDraft): Promise<Place | null>;
   /** Status, APPROVE / REOPEN on the right of the place (plans), or nothing (an open structure scene). */
   status?: { label: string; approved: boolean; busy: boolean; onApprove(): void; onReopen(): void };
+  /** The act's text is approved: the scene is final, shown without APPROVE / REOPEN and not editable. */
+  final?: boolean;
   /** Move / cut buttons of a structure scene. */
   tools?: ReactNode;
   updating?: boolean;
@@ -43,8 +45,10 @@ export function ScenePlanCard({
   updating = false,
   highlighted = false,
   notice,
-  readOnly = false,
+  readOnly: readOnlyProp = false,
+  final = false,
 }: ScenePlanCardProps) {
+  const readOnly = readOnlyProp || final;
   const [newPlace, setNewPlace] = useState<PlaceDraft | null>(null);
   const [creating, setCreating] = useState(false);
   const place = places.find((p) => p.id === plan.place_id);
@@ -93,15 +97,17 @@ export function ScenePlanCard({
               <span className={cn("ml-auto font-sans text-[10px] tracking-[1.5px]", status.approved ? "text-gold" : "text-muted-2")}>
                 {status.label}
               </span>
-              <HeaderPill
-                small
-                ghost={status.approved}
-                disabled={status.busy || creating || readOnly}
-                aria-label={`${status.approved ? "Reopen" : "Approve"} scene ${number}`}
-                onClick={status.approved ? status.onReopen : () => void approve()}
-              >
-                {status.approved ? "REOPEN" : "APPROVE"}
-              </HeaderPill>
+              {!final && (
+                <HeaderPill
+                  small
+                  ghost={status.approved}
+                  disabled={status.busy || creating || readOnly}
+                  aria-label={`${status.approved ? "Reopen" : "Approve"} scene ${number}`}
+                  onClick={status.approved ? status.onReopen : () => void approve()}
+                >
+                  {status.approved ? "REOPEN" : "APPROVE"}
+                </HeaderPill>
+              )}
             </>
           )}
         </div>

@@ -94,6 +94,11 @@ export function PlayPage() {
           status={header.status}
           chat={hasChat ? { open: chatOpen, onToggle: actions.toggleChat } : undefined}
         >
+          {header.secondary && (
+            <HeaderPill ghost disabled={header.secondary.disabled} onClick={header.secondary.onClick}>
+              {header.secondary.label}
+            </HeaderPill>
+          )}
           {header.button && (
             <HeaderPill disabled={header.button.disabled} onClick={header.button.onClick}>
               {header.button.label}
@@ -104,8 +109,8 @@ export function PlayPage() {
         <div className={cn("split", showActs && "split-on")}>
           <aside className="split-side" aria-label="Play outline">
             <div className="split-full scroll-thin box-border px-12 pt-5 pb-12">
-              {/* the first outline: nothing under the veil, the fields fade in once it is written */}
-              {story.outline && (
+              {/* while the outline is written: nothing under the veil, the fields fade in once it is there */}
+              {story.outline && !jobs.includes("outline") && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
                   <OutlineEditor
                     outline={story.outline}
@@ -170,6 +175,8 @@ interface PlayHeader {
   sub: string;
   status: boolean;
   button: { label: string; disabled: boolean; onClick(): void } | null;
+  /** A ghost pill before the main one: write the outline or draft the acts again. */
+  secondary?: { label: string; disabled: boolean; onClick(): void };
 }
 
 /** The header follows the play: outline, acts being drafted, acts to approve, then the act being built. */
@@ -178,8 +185,8 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
   const outline = story.outline;
 
   if (!showActs) {
-    if (!outline) {
-      const writing = !failed.includes("outline");
+    if (!outline || jobs.includes("outline")) {
+      const writing = jobs.includes("outline") || !failed.includes("outline");
       return {
         tag: "OUTLINE",
         title: "A new play",
@@ -195,6 +202,7 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
       title: outline.title || "Untitled play",
       sub: [genreLabel(outline.genre), firstClause(outline.tone)].filter(Boolean).join(" · "),
       status: false,
+      secondary: { label: "REWRITE OUTLINE", disabled: typing === "outline", onClick: actions.generateOutline },
       button: {
         label: "APPROVE OUTLINE",
         disabled: !outline.title.trim() || !outline.synopsis.trim() || typing === "outline" || jobs.includes("acts"),
@@ -205,7 +213,7 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
 
   const count = story.acts.length;
   const title = count ? `${numberWord(count)} acts` : "The acts";
-  if (count === 0) {
+  if (count === 0 || jobs.includes("acts")) {
     return { tag: "ACTS", title, sub: "The acts are being drafted from the synopsis…", status: true, button: { label: "APPROVE ACTS", disabled: true, onClick: () => {} } };
   }
   if (!story.acts_approved) {
@@ -214,6 +222,7 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
       title,
       sub: outline?.premise ?? "",
       status: false,
+      secondary: { label: "REDRAFT ACTS", disabled: jobs.includes("approveActs") || typing === "acts", onClick: actions.redraftActs },
       button: { label: "APPROVE ACTS", disabled: jobs.includes("approveActs") || typing === "acts", onClick: actions.approveActs },
     };
   }
@@ -248,7 +257,8 @@ function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: A
   const waitingToStage = isCurrent && act.status === "draft" && act.scenes.length === 0;
 
   let veil: ActCardProps["veil"] = null;
-  if (jobs.includes(`record:${n}`)) veil = { label: "RECORDING THE CHANGES", line: `Writing down what ${name} changed for each character…` };
+  if (jobs.includes("acts")) veil = { label: `DRAFTING ACT ${word}`, line: "Shaping the act from the synopsis…" };
+  else if (jobs.includes(`record:${n}`)) veil = { label: "RECORDING THE CHANGES", line: `Writing down what ${name} changed for each character…` };
   else if (jobs.includes(`text:${n}`)) veil = { label: `WRITING ACT ${word}`, line: "Turning the scenes into dialogue…" };
   else if (jobs.includes(`structure:${n}`) || (waitingToStage && !failed.includes(`structure:${n}`)))
     veil = { label: `STAGING ACT ${word}`, line: "Choosing places and who is on stage…" };

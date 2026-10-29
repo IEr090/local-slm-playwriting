@@ -43,51 +43,22 @@ export function formatSceneText(blocks: ScriptBlock[]): string {
   return blocks.map(formatBlock).join("\n\n");
 }
 
-/** The scene text with the words of block `index` replaced (a speech keeps its speaker and note). */
-export function replaceBlockText(text: string, index: number, value: string): string {
+/** The scene text with block `index` changed: its words, or the speaker and note of a speech. */
+export function updateBlock(text: string, index: number, patch: Partial<{ text: string; who: string; paren: string }>): string {
   const blocks = parseSceneText(text);
-  if (!blocks[index]) return text;
-  blocks[index] = { ...blocks[index], text: value };
+  const block = blocks[index];
+  if (!block) return text;
+  blocks[index] = block.kind === "speech" ? { ...block, ...patch } : { ...block, text: patch.text ?? block.text };
   return formatSceneText(blocks);
 }
 
-const words = (text: string) => new Set(text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []);
-
-/** Share of the words of `a` that are also in `b`. */
-function overlap(a: string, b: string): number {
-  const wa = words(a);
-  if (!wa.size) return 0;
-  const wb = words(b);
-  return [...wa].filter((w) => wb.has(w)).length / wa.size;
+/** The scene text with a new block after block `index` (-1: at the start). */
+export function insertBlock(text: string, index: number, block: ScriptBlock): string {
+  const blocks = parseSceneText(text);
+  blocks.splice(index + 1, 0, block);
+  return formatSceneText(blocks);
 }
 
-/**
- * The scene text the agent returned, made safe: the backend replaces a whole scene with the lines the model
- * wrote, and a small model often writes only the lines it changed. When the answer has far fewer lines than
- * the scene, each returned line replaces the most similar line of the same speaker and the rest is kept.
- */
-export function mergeRevisedScene(before: string, after: string): string {
-  const old = parseSceneText(before);
-  const revised = parseSceneText(after);
-  if (old.length < 4 || revised.length >= old.length * 0.6) return after;
-  const merged = [...old];
-  const used = new Set<number>();
-  for (const block of revised) {
-    let best = -1;
-    let score = -1;
-    merged.forEach((candidate, i) => {
-      if (used.has(i) || candidate.kind !== block.kind) return;
-      if (block.kind === "speech" && candidate.kind === "speech" && candidate.who !== block.who) return;
-      const s = overlap(block.text, candidate.text);
-      if (s > score) {
-        best = i;
-        score = s;
-      }
-    });
-    if (best >= 0) {
-      merged[best] = block;
-      used.add(best);
-    }
-  }
-  return formatSceneText(merged);
+export function removeBlock(text: string, index: number): string {
+  return formatSceneText(parseSceneText(text).filter((_, i) => i !== index));
 }

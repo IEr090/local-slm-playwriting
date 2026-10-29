@@ -11,13 +11,13 @@ import { actName, OUTLINE_FIELD_LABEL } from "@/features/story/model/labels";
 import { withLocalEdits, type EditKey } from "@/features/story/model/local-edits";
 import { currentAct, nextSceneToPlan } from "@/features/story/model/progress";
 import { addBlankScene, cutScene, moveScene, toPlan, toScenes } from "@/features/story/model/scenes";
-import { mergeRevisedScene, replaceBlockText } from "@/features/story/model/script";
 import { aboutLabel, predictTargets } from "@/features/story/model/targets";
 import type { HistoryMessage, Outline, PlaceDraft, Scene, ScenePlan, StoryBible } from "@/features/story/model/types";
 import { paths } from "@/features/story/paths";
 import { isAbort } from "@/shared/api/errors";
 import { useErrors } from "@/shared/errors/errors-context";
 import type { ChatBubble } from "@/shared/ui/chat/ChatMessage";
+import { forgetAllJobs, forgetJob, rememberJob, resumableJobs } from "./resumable";
 import { ActionsContext, StateContext, type ChatContext, type StoryActions } from "./story-context";
 import { initialState, reducer, type ChatKey, type JobKey } from "./story-reducer";
 
@@ -138,6 +138,26 @@ export function StoryProvider({ children }: { children: ReactNode }) {
   const running = useRef(new Set<JobKey>());
   const controllers = useRef(new Map<JobKey, AbortController>());
 
+  // A reload or a closed tab cancels the running requests: that is not a failure to report or to forget.
+  const unloading = useRef(false);
+  useEffect(() => {
+    const leave = () => {
+      unloading.current = true;
+    };
+    // back from the back-forward cache: the page lives on
+    const back = () => {
+      unloading.current = false;
+    };
+    window.addEventListener("pagehide", leave);
+    window.addEventListener("beforeunload", leave);
+    window.addEventListener("pageshow", back);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      window.removeEventListener("beforeunload", leave);
+      window.removeEventListener("pageshow", back);
+    };
+  }, []);
+
   /**
    * Runs one request at a time per key; the key is shown as running (veils, disabled buttons) until it ends.
    * Resolves to the answer, or undefined if it failed (banner) or was aborted.
@@ -156,7 +176,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "jobEnded", key });
         return result;
       } catch (error) {
-        if (isAbort(error) || controller.signal.aborted || from !== epoch.current) return undefined;
+        if (isAbort(error) || controller.signal.aborted || from !== epoch.current || unloading.current) return undefined;
         dispatch({ type: "jobEnded", key, failed: true });
         showError(error);
         return undefined;
@@ -199,6 +219,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
     savedVersion.current.clear();
     historyRequested.current.clear();
     loading.current = false;
+    forgetAllJobs();
     dispatch({ type: "reset" });
   }, []);
 
@@ -346,7 +367,8 @@ export function StoryProvider({ children }: { children: ReactNode }) {
             dispatch(action);
             stateRef.current = reducer(stateRef.current, action);
             edited(`act:${number}`, 0);
-            updated.push(actName(number));
+            const before = sent.find((item) => item.number === number)!;
+            updated.push(before.dramatic_function !== revised.dramatic_function ? `${actName(number)} · dramatic function` : actName(number));
             highlight.push(`act:${number}`);
           }
           dispatch({ type: "replyReceived", key, text: result.reply, updated, highlight });
@@ -379,16 +401,8 @@ export function StoryProvider({ children }: { children: ReactNode }) {
           dispatch({ type: "replyReceived", key, text: result.reply, updated, highlight });
         } else if (kind === "text" && act && n !== undefined) {
           const sent = act.scene_texts;
-          const answer = await api.reviseText(n, sent, text);
+          const result = await api.reviseText(n, sent, text);
           if (from !== epoch.current) return;
-          // the backend replaces a whole scene with what the model wrote, which may be only the changed lines
-          const result = {
-            ...answer,
-            scene_texts: answer.scene_texts.map((item) => {
-              const before = sent.find((old) => old.scene_number === item.scene_number);
-              return before ? { ...item, text: mergeRevisedScene(before.text, item.text) } : item;
-            }),
-          };
           const numbers = changedSceneTextNumbers(sent, result.scene_texts);
           if (numbers.length) {
             const sceneTexts = sent.map((item) =>
@@ -448,6 +462,12 @@ export function StoryProvider({ children }: { children: ReactNode }) {
     },
     [edited],
   );
+
+  /** Drafts the acts again, before they are approved. */
+  const redraftActs = useCallback(async () => {
+    await flushAll("act:");
+    void runStoryJob("acts", (signal) => api.generateActs({ signal }));
+  }, [flushAll, runStoryJob]);
 
   const approveActs = useCallback(async () => {
     await flushAll("act:");
@@ -526,36 +546,76 @@ export function StoryProvider({ children }: { children: ReactNode }) {
 
   // ---------- one act: text ----------
 
+  /** Writes the text; remembered in the tab, so a reload in between starts it again. */
+  const startWriting = useCallback(
+    async (n: number) => {
+      rememberJob(`text:${n}`);
+      const done = await runStoryJob(`text:${n}`, (signal) => api.generateText(n, { signal }));
+      // a reload cancelled it: it stays remembered and starts again on the next load
+      if (unloading.current) return;
+      forgetJob(`text:${n}`);
+      if (done) {
+        // the backend starts the act page's chat anew with the new text
+        historyRequested.current.delete(`act:${n}`);
+        dispatch({ type: "chatCleared", key: `act:${n}` });
+      }
+    },
+    [runStoryJob],
+  );
+
   const writeText = useCallback(
     async (n: number) => {
       await flushAll(`scene:${n}:`, `scenes:${n}`);
       dispatch({ type: "setEditingScenes", number: n, editing: false });
       navigate(paths.play);
-      void runStoryJob(`text:${n}`, (signal) => api.generateText(n, { signal }));
+      void startWriting(n);
     },
-    [flushAll, navigate, runStoryJob],
+    [flushAll, navigate, startWriting],
   );
 
   const editSceneText = useCallback(
-    (n: number, scene: number, block: number, value: string) => {
+    (n: number, scene: number, text: string) => {
       const act = findAct(n);
       if (!act) return;
-      const sceneTexts = act.scene_texts.map((item) =>
-        item.scene_number === scene ? { ...item, text: replaceBlockText(item.text, block, value) } : item,
-      );
+      const sceneTexts = act.scene_texts.map((item) => (item.scene_number === scene ? { ...item, text } : item));
       dispatch({ type: "sceneTextsEdited", number: n, sceneTexts });
       edited(`text:${n}`, 800);
     },
     [edited],
   );
 
+  /** Approves the text and records the histories; remembered in the tab like writing. */
+  const startRecording = useCallback(
+    async (n: number) => {
+      rememberJob(`record:${n}`);
+      await runStoryJob(`record:${n}`, (signal) => api.approveText(n, { signal }));
+      if (!unloading.current) forgetJob(`record:${n}`);
+    },
+    [runStoryJob],
+  );
+
   const approveText = useCallback(
     async (n: number) => {
       await flush(`text:${n}`);
-      void runStoryJob(`record:${n}`, (signal) => api.approveText(n, { signal }));
+      void startRecording(n);
     },
-    [flush, runStoryJob],
+    [flush, startRecording],
   );
+
+  // After a reload: start again what the reload cancelled, if the act still needs it.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!state.loaded || !state.story || resumed.current) return;
+    resumed.current = true;
+    for (const job of resumableJobs()) {
+      const [kind, value] = job.split(":");
+      const act = state.story.acts.find((item) => item.number === Number(value));
+      if (act?.status !== "scenes_approved") forgetJob(job);
+      else if (kind === "text") void startWriting(act.number);
+      else if (act.scene_texts.length > 0) void startRecording(act.number);
+      else forgetJob(job);
+    }
+  }, [state.loaded, state.story, startWriting, startRecording]);
 
   // ---------- public actions ----------
 
@@ -570,6 +630,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
       editOutline,
       approveOutline: () => void approveOutline(),
       editActSummary,
+      redraftActs: () => void redraftActs(),
       approveActs: () => void approveActs(),
       stageAct,
       openAct: (n) => navigate(paths.act(n)),
@@ -590,7 +651,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
       approveText: (n) => void approveText(n),
     }),
     [
-      chatOpened, actOpened, sendMessage, generateOutline, editOutline, approveOutline, editActSummary, approveActs,
+      chatOpened, actOpened, sendMessage, generateOutline, editOutline, approveOutline, editActSummary, redraftActs, approveActs,
       stageAct, navigate, restructure, approveStructure, editScenePlan, approveScene, reopenScene, createPlace,
       writeText, editSceneText, approveText,
     ],

@@ -24,6 +24,18 @@ class GeneratedStructure(BaseModel):
     scenes: list[GeneratedStructureScene]
 
 
+MIN_SCENES = 2
+MAX_SCENES = 8
+
+
+# The limits are part of the JSON schema sent to the model, so a small model cannot stage an act as one scene.
+# Only the first structure is limited; the playwright may cut scenes in the chat afterwards.
+class GeneratedActStructure(GeneratedStructure):
+    """Represent the first structure of an act, with a sensible number of scenes."""
+
+    scenes: list[GeneratedStructureScene] = Field(min_length=MIN_SCENES, max_length=MAX_SCENES)
+
+
 class GeneratedScenePlan(BaseModel):
     """Represent the detailed plan of one scene as the language model writes it."""
 

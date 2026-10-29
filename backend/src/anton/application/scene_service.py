@@ -139,7 +139,7 @@ class SceneService:
     def edit_scene(self, number: int, scene_number: int, plan: ScenePlan) -> StoryBible:
         """Replace the plan of a scene with the one the user edited by hand; the scene has to be approved again."""
         story = self._get_story()
-        act = _require_structure_approved(story, number)
+        act = _require_scenes_open(story, number)
         scene = find_scene(act, scene_number)
         self._check_references(story, [plan])
         for field, value in plan.model_dump().items():
@@ -151,13 +151,13 @@ class SceneService:
     async def revise_scenes(self, number: int, plans: list[ScenePlan], message: str) -> SceneRevision:
         """Send the user's message with the scene plans from their form to the act agent; only new places are saved."""
         story = self._get_story()
-        act = _require_structure_approved(story, number)
+        act = _require_scenes_open(story, number)
         return await self._revise(self.scenes_agent, story, act, plans, message)
 
     def approve_scene(self, number: int, scene_number: int) -> StoryBible:
         """Approve the plan of a scene; when the last scene is approved, the act's scenes are approved."""
         story = self._get_story()
-        act = _require_structure_approved(story, number)
+        act = _require_scenes_open(story, number)
         scene = find_scene(act, scene_number)
         if not scene.planned:
             raise StoryOrderError(f"Scene {scene_number} has no plan yet.")
@@ -170,7 +170,7 @@ class SceneService:
     def reopen_scene(self, number: int, scene_number: int) -> StoryBible:
         """Take back the approval of a scene, so it can be changed again."""
         story = self._get_story()
-        act = _require_structure_approved(story, number)
+        act = _require_scenes_open(story, number)
         _reopen(act, find_scene(act, scene_number))
         self.story_repository.save(story)
         return story
@@ -212,7 +212,7 @@ class SceneService:
 
     def _get_scene_to_plan(self, story: StoryBible, number: int, scene_number: int) -> tuple[Act, Scene]:
         """Return the act and the scene to plan and make sure the scene before it is approved."""
-        act = _require_structure_approved(story, number)
+        act = _require_scenes_open(story, number)
         scene = find_scene(act, scene_number)
         if scene.status == "approved":
             raise StoryOrderError(f"Scene {scene_number} is approved. Reopen it to plan it again.")
@@ -269,6 +269,17 @@ def _require_structure_approved(story: StoryBible, number: int) -> Act:
     act = require_open_act(story, number)
     if act.status == "draft":
         raise StoryOrderError(f"Approve the structure of Act {number} first.")
+    return act
+
+
+def _require_scenes_open(story: StoryBible, number: int) -> Act:
+    """Return the act while its scenes can be planned and changed: the structure is approved, the text is not.
+
+    An approved text is final: the characters' histories and the next act are built from it.
+    """
+    act = _require_structure_approved(story, number)
+    if act.status == "text_approved":
+        raise StoryOrderError(f"The text of Act {number} is approved, so its scenes can no longer be changed.")
     return act
 
 

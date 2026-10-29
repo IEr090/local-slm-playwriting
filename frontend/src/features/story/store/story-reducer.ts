@@ -66,6 +66,7 @@ export type Action =
   | { type: "toggleChat" }
   | { type: "setDraft"; draft: string }
   | { type: "chatLoaded"; key: ChatKey; messages: ChatBubble[] }
+  | { type: "chatCleared"; key: ChatKey }
   | { type: "messageSent"; key: ChatKey; text: string; about?: string; pending: string[] }
   | { type: "replyReceived"; key: ChatKey; text: string; updated: string[]; highlight: string[] }
   | { type: "replyFailed"; key: ChatKey }
@@ -124,6 +125,10 @@ export function reducer(state: StoryState, action: Action): StoryState {
     case "chatLoaded":
       // a message sent before the history arrived already started the chat
       return state.chats[action.key] ? state : { ...state, chats: { ...state.chats, [action.key]: action.messages } };
+    case "chatCleared": {
+      const { [action.key]: _cleared, ...chats } = state.chats;
+      return { ...state, chats };
+    }
     case "messageSent":
       return {
         ...state,

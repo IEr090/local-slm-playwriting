@@ -1,5 +1,6 @@
-from anton.application.llm_schemas.text_generation import EditedSceneTexts
-from anton.application.mappers.text_mapper import format_lines
+from anton.application.agents.change_lines import line_replacements, to_line
+from anton.application.llm_schemas.text_generation import EditedSceneTexts, LineEdit
+from anton.application.mappers.text_mapper import apply_line_edits
 from anton.domain.models import SceneText
 
 
@@ -15,11 +16,20 @@ class TextTarget:
         """Show the model the text of every scene with its number."""
         return [scene_text.model_dump() for scene_text in data]
 
+    def parse_changes(self, data: list[SceneText], changes: str) -> list[SceneText] | None:
+        """Apply changes written as `scene N replace "old" with "new"` without the model; None if not written so."""
+        replacements = line_replacements(changes)
+        if not replacements:
+            return None
+        edits = [LineEdit(scene_number=scene, old_line=old, new_lines=[to_line(new)] if new.strip() else []) for scene, old, new in replacements]
+        return self.apply(data, EditedSceneTexts(edits))
+
     def apply(self, data: list[SceneText], edited: EditedSceneTexts) -> list[SceneText]:
-        """Replace only the scene texts the model rewrote; numbers the act does not have are ignored."""
-        by_number = {item.scene_number: format_lines(item.lines) for item in edited.root}
+        """Apply the model's line edits to their scenes; scene numbers the act does not have are ignored."""
         return [
-            SceneText(scene_number=item.scene_number, text=by_number[item.scene_number])
-            if by_number.get(item.scene_number) else item
+            SceneText(
+                scene_number=item.scene_number,
+                text=apply_line_edits(item.text, [edit for edit in edited.root if edit.scene_number == item.scene_number]),
+            )
             for item in data
         ]

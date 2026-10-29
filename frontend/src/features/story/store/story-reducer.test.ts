@@ -95,6 +95,11 @@ describe("story reducer", () => {
     expect(reducer(started, { type: "chatLoaded", key: "acts", messages: history }).chats.acts).toHaveLength(1);
   });
 
+  it("clears one chat, e.g. when the act page's chat starts anew", () => {
+    const state = reducer(withStory(), { type: "messageSent", key: "act:1", text: "x", pending: [] });
+    expect(reducer(state, { type: "chatCleared", key: "act:1" }).chats["act:1"]).toBeUndefined();
+  });
+
   it("toggles the chat and the scene editor of an act", () => {
     expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
     let state = reducer(initialState, { type: "setEditingScenes", number: 2, editing: true });

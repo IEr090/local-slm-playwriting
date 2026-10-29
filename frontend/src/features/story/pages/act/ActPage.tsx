@@ -108,7 +108,9 @@ export function ActPage() {
     </>
   );
 
-  const sceneCards = act.scenes.map((scene, i) => {
+  // an approved text is final: its scenes can be read but no longer changed, and there is no chat
+  const final = act.status === "text_approved";
+  const sceneCards = (stage === "staging" ? [] : act.scenes).map((scene, i) => {
     const no = scene.number;
     const target = `scene:${n}:${no}`;
     if (stage === "structure") {
@@ -192,6 +194,7 @@ export function ActPage() {
           onReopen: () => actions.reopenScene(n, no),
         }}
         readOnly={stage !== "plans"}
+        final={final}
         updating={isPending(target)}
         highlighted={highlight.includes(target)}
         notice={outdated}
@@ -215,12 +218,17 @@ export function ActPage() {
           title={name}
           sub={header.sub}
           status={header.status}
-          chat={{ open: chatOpen, onToggle: actions.toggleChat }}
+          chat={final ? undefined : { open: chatOpen, onToggle: actions.toggleChat }}
         >
           <HeaderPill ghost onClick={actions.goToPlay}>
             <ArrowLeft />
             <span>ALL ACTS</span>
           </HeaderPill>
+          {header.secondary && (
+            <HeaderPill ghost disabled={header.secondary.disabled} onClick={header.secondary.onClick}>
+              {header.secondary.label}
+            </HeaderPill>
+          )}
           {header.button && (
             <HeaderPill disabled={header.button.disabled} onClick={header.button.onClick}>
               {header.button.label}
@@ -288,7 +296,7 @@ export function ActPage() {
                   disabled={stage === "writing" || stage === "recording"}
                   onClick={() => actions.setEditingScenes(n, true)}
                 >
-                  EDIT SCENES
+                  {final ? "VIEW SCENES" : "EDIT SCENES"}
                 </HeaderPill>
               </div>
               <div className="mt-[14px] font-serif text-[17px] leading-[1.35] text-gold-soft italic">{act.summary}</div>
@@ -320,7 +328,7 @@ export function ActPage() {
                 veil={textVeil}
                 approved={stage === "done"}
                 editable={stage === "text"}
-                onEdit={(scene, block, value) => actions.editSceneText(n, scene, block, value)}
+                onEdit={(scene, text) => actions.editSceneText(n, scene, text)}
                 rewriting={act.scene_texts.map((t) => t.scene_number).filter((s) => isPending(`scene:${n}:${s}`))}
                 highlighted={highlight.filter((h) => h.startsWith(`block:${n}:`)).map((h) => h.split(":").slice(2).join(":"))}
               />
@@ -329,16 +337,18 @@ export function ActPage() {
         </div>
       </div>
 
-      <ChatPanel
-        open={chatOpen}
-        intro={chatIntro(stage)}
-        placeholder={chatKind === "structure" ? "Add, cut or change a scene…" : "Scene 3: what should change…"}
-        messages={chats[`act:${n}`] ?? []}
-        typing={typing === `act:${n}`}
-        draft={draft}
-        onDraftChange={actions.setDraft}
-        onSend={() => void actions.sendMessage({ kind: chatKind, act: n })}
-      />
+      {!final && (
+        <ChatPanel
+          open={chatOpen}
+          intro={chatIntro(stage)}
+          placeholder={chatKind === "structure" ? "Add, cut or change a scene…" : "Scene 3: what should change…"}
+          messages={chats[`act:${n}`] ?? []}
+          typing={typing === `act:${n}`}
+          draft={draft}
+          onDraftChange={actions.setDraft}
+          onSend={() => void actions.sendMessage({ kind: chatKind, act: n })}
+        />
+      )}
       <Toast open={notice.open}>{notice.message}</Toast>
     </div>
   );
@@ -385,6 +395,8 @@ interface ActHeader {
   sub: string;
   status: boolean;
   button: { label: string; disabled: boolean; onClick(): void } | null;
+  /** A ghost pill before the main one, e.g. RESTAGE. */
+  secondary?: { label: string; disabled: boolean; onClick(): void };
 }
 
 function actHeader(state: StoryState, story: StoryBible, act: Act, stage: ActStage, actions: Actions): ActHeader {
@@ -405,6 +417,7 @@ function actHeader(state: StoryState, story: StoryBible, act: Act, stage: ActSta
         tag: "STRUCTURE DRAFT",
         sub: `${count} ${count === 1 ? "scene" : "scenes"} proposed. Reorder, cut or add before approving the structure.`,
         status: false,
+        secondary: { label: "RESTAGE", disabled: chatBusy || jobs.includes(`approveStructure:${n}`), onClick: () => actions.stageAct(n) },
         button: {
           label: "APPROVE STRUCTURE",
           disabled: count === 0 || chatBusy || jobs.includes(`approveStructure:${n}`),

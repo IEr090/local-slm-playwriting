@@ -1,7 +1,13 @@
 from unittest import IsolatedAsyncioTestCase, TestCase
 
 from anton.application.agents.scene_targets import SceneBoard, SceneView, ScenesTarget, StructureTarget
-from anton.application.llm_schemas.scene_generation import EditedScene, EditedScenes, GeneratedPlace
+from anton.application.llm_schemas.scene_generation import (
+    EditedScene,
+    EditedScenes,
+    GeneratedActStructure,
+    GeneratedPlace,
+    GeneratedStructureScene,
+)
 from anton.application.scene_planner import ScenePlanner
 from anton.domain.models import PlaceDraft
 from tests.unit.fakes import FakeSLMClient
@@ -79,3 +85,14 @@ class ScenePlannerTest(IsolatedAsyncioTestCase):
         self.assertEqual((plan.place_notes, plan.what_happens), ("Shutters barred", "Late afternoon. Elias arrives soaked."))
         self.assertTrue(client.calls[0]["think"])
         self.assertIn('"act_summary": "Act."', client.calls[0]["user_prompt"])
+
+
+class StructureLimitTest(TestCase):
+    """Test the limits of the first structure of an act."""
+
+    def test_schema_asks_for_two_to_eight_scenes(self) -> None:
+        """Send the limits to the model and reject an act of one scene."""
+        schema = StructureTarget.generate_schema.model_json_schema()["properties"]["scenes"]
+        self.assertEqual((schema["minItems"], schema["maxItems"]), (2, 8))
+        with self.assertRaises(ValueError):
+            GeneratedActStructure(new_places=[], scenes=[GeneratedStructureScene(place="A", characters=[], what_happens="B")])

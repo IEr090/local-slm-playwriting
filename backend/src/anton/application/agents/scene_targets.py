@@ -1,7 +1,10 @@
 from pydantic import BaseModel
 
+from anton.application.agents.change_lines import field_values
+
 from anton.application.llm_schemas.scene_generation import (
     EditedScenes,
+    GeneratedActStructure,
     GeneratedPlace,
     GeneratedStructure,
     GeneratedStructureScene,
@@ -34,7 +37,7 @@ class StructureTarget:
     edit_prompt = "structure_edit.md"
     edit_schema = GeneratedStructure
     generate_prompt = "act_structure.md"
-    generate_schema = GeneratedStructure
+    generate_schema = GeneratedActStructure
 
     def view(self, data: SceneBoard) -> list[dict]:
         """Show the model every scene of the structure in order."""
@@ -66,6 +69,19 @@ class ScenesTarget:
     def view(self, data: SceneBoard) -> list[dict]:
         """Show the model every scene with its plan."""
         return [scene.model_dump() for scene in data.scenes]
+
+    def parse_changes(self, data: SceneBoard, changes: str) -> SceneBoard | None:
+        """Apply changes written as `scene N field_key: new value` without the model; None if they are not written so."""
+        values = field_values(changes, {"place", "place_notes", "characters", "what_happens"}, prefix="scene")
+        if not values:
+            return None
+        scenes = []
+        for scene in data.scenes:
+            patch: dict = {key: value.strip() for key, value in values.get(str(scene.number), {}).items()}
+            if "characters" in patch:
+                patch["characters"] = [name.strip() for name in patch["characters"].split(",") if name.strip()]
+            scenes.append(scene.model_copy(update=patch))
+        return SceneBoard(scenes=scenes, new_places=[])
 
     def apply(self, data: SceneBoard, edited: EditedScenes) -> SceneBoard:
         """Replace only the scenes the model edited; numbers the act does not have are ignored."""

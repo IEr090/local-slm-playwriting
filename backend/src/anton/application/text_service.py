@@ -68,6 +68,8 @@ class TextService:
         act.scene_texts = scene_texts
         act.text_built_from_scenes = [scene.to_plan() for scene in act.scenes]
         self.story_repository.save(story)
+        # The chat of the act page is about scenes and an earlier text; the new text starts it anew.
+        await self.text_agent.forget(act_thread(number))
         return story
 
     def edit_text(self, number: int, scene_texts: list[SceneText]) -> StoryBible:

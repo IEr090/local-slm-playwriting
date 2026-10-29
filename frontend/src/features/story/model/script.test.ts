@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSceneText, mergeRevisedScene, parseBlock, parseSceneText, replaceBlockText } from "./script";
+import { formatSceneText, insertBlock, parseBlock, parseSceneText, removeBlock, updateBlock } from "./script";
 
 const TEXT = [
   "(Late afternoon. The shutters are barred.)",
@@ -28,35 +28,23 @@ describe("scene text", () => {
     expect(formatSceneText(parseSceneText(TEXT))).toBe(TEXT);
   });
 
-  it("replaces the words of one block and keeps the speaker", () => {
-    const changed = replaceBlockText(TEXT, 2, "Four places.");
+  it("changes the words of one block and keeps the speaker", () => {
+    const changed = updateBlock(TEXT, 2, { text: "Four places." });
     expect(parseSceneText(changed)[2]).toEqual({ kind: "speech", who: "ELIAS", paren: "looking at the table", text: "Four places." });
-    expect(replaceBlockText(TEXT, 9, "x")).toBe(TEXT);
-  });
-});
-
-describe("mergeRevisedScene", () => {
-  const scene = [
-    "(Night. The lamp room.)",
-    "ELIAS (trembling): The lens is clear. The storm hasn't damaged the lighthouse.",
-    "AVA: The plans are ready.",
-    "ELIAS: Then we wait.",
-    "(The wind rises.)",
-  ].join("\n\n");
-
-  it("keeps a full answer as it is", () => {
-    const full = scene.replace("Then we wait.", "Then we go.");
-    expect(mergeRevisedScene(scene, full)).toBe(full);
+    expect(updateBlock(TEXT, 9, { text: "x" })).toBe(TEXT);
   });
 
-  it("puts a few returned lines in place of the most similar line of the same speaker", () => {
-    const merged = parseSceneText(mergeRevisedScene(scene, "ELIAS (trembling): The lens is clear."));
-    expect(merged).toHaveLength(5);
-    expect(merged[1]).toEqual({ kind: "speech", who: "ELIAS", paren: "trembling", text: "The lens is clear." });
-    expect(merged[3]).toEqual({ kind: "speech", who: "ELIAS", paren: "", text: "Then we wait." });
+  it("changes the speaker and the note of a speech, only the words of a direction", () => {
+    expect(parseSceneText(updateBlock(TEXT, 1, { who: "MABEL", paren: "softly" }))[1]).toEqual({
+      kind: "speech", who: "MABEL", paren: "softly", text: "You came on the post boat.",
+    });
+    expect(parseSceneText(updateBlock(TEXT, 0, { text: "Night.", who: "X" }))[0]).toEqual({ kind: "direction", text: "Night." });
   });
 
-  it("leaves short scenes to the agent", () => {
-    expect(mergeRevisedScene("A: x\n\nB: y", "A: z")).toBe("A: z");
+  it("inserts and removes lines, also empty new ones", () => {
+    const inserted = insertBlock(TEXT, 1, { kind: "speech", who: "ELIAS", paren: "", text: "" });
+    expect(parseSceneText(inserted)[2]).toEqual({ kind: "speech", who: "ELIAS", paren: "", text: "" });
+    expect(parseSceneText(insertBlock(TEXT, -1, { kind: "direction", text: "" }))[0]).toEqual({ kind: "direction", text: "" });
+    expect(removeBlock(inserted, 2)).toBe(TEXT);
   });
 });
