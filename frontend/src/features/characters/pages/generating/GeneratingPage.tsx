@@ -6,7 +6,7 @@ import { Pill } from "@/shared/ui/Pill";
 import { fullName } from "@/features/characters/model/text";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
 import { FlowingNames, FlowingWords } from "./FlowingText";
-import { Axis, Fog, Orrery, Stars } from "./Scenery";
+import { Axis, Fog, Orrery, SideNodes, Stars } from "./Scenery";
 import { STATUS } from "./timeline";
 import { useGeneration } from "./use-generation";
 
@@ -19,7 +19,7 @@ export function GeneratingPage() {
   return <GenerationStage />;
 }
 
-/** A fixed 1280×800 stage, centred. */
+/** Background layers over the whole window; the animation on a fixed 1280×800 stage, centred. */
 function GenerationStage() {
   const { premise, generation, cast } = useCastState();
   const { cancelGeneration, finishGeneration } = useCastActions();
@@ -33,10 +33,11 @@ function GenerationStage() {
 
   return (
     <div className="absolute inset-0 overflow-hidden">
+      <Fog />
+      <Stars />
+      <Axis />
       <div className="absolute top-1/2 left-1/2 h-[800px] w-[1280px] -translate-x-1/2 -translate-y-1/2">
-        <Fog />
-        <Stars />
-        <Axis />
+        <SideNodes />
         <Orrery />
 
         <div className="absolute top-[590px] left-0 flex w-[1280px] flex-col items-center gap-[14px]">

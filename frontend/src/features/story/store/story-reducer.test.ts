@@ -95,9 +95,8 @@ describe("story reducer", () => {
     expect(reducer(started, { type: "chatLoaded", key: "acts", messages: history }).chats.acts).toHaveLength(1);
   });
 
-  it("toggles the chat, the outline editor and the scene editor of an act", () => {
+  it("toggles the chat and the scene editor of an act", () => {
     expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
-    expect(reducer(initialState, { type: "setEditingOutline", editing: true }).editingOutline).toBe(true);
     let state = reducer(initialState, { type: "setEditingScenes", number: 2, editing: true });
     state = reducer(state, { type: "setEditingScenes", number: 2, editing: true });
     expect(state.editingScenes).toEqual([2]);

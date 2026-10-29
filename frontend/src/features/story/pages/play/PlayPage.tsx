@@ -1,45 +1,50 @@
+import { motion } from "motion/react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ACT_STATUS_LABEL, actName, firstClause, genreLabel, numberWord, roman } from "@/features/story/model/labels";
-import { canOpenAct, currentAct } from "@/features/story/model/progress";
-import type { Act, Outline, OutlineField, StoryBible } from "@/features/story/model/types";
+import { canOpenAct, currentAct, isOpenAct } from "@/features/story/model/progress";
+import type { Act, OutlineField, StoryBible } from "@/features/story/model/types";
 import { useStoryActions, useStoryState } from "@/features/story/store/story-context";
 import type { StoryState } from "@/features/story/store/story-reducer";
+import { useTimedMessage } from "@/shared/hooks/use-timed-message";
 import { cn } from "@/shared/lib/utils";
 import { ChatPanel } from "@/shared/ui/chat/ChatPanel";
 import { GenerationVeil } from "@/shared/ui/GenerationVeil";
 import { HeaderPill } from "@/shared/ui/HeaderPill";
 import { ArrowLeft } from "@/shared/ui/icons";
 import { Notice } from "@/shared/ui/Notice";
+import { Toast } from "@/shared/ui/Toast";
 import { StoryHeader } from "../StoryHeader";
 import { ActCard, type ActCardProps } from "./ActCard";
 import { OutlineEditor } from "./OutlineEditor";
 import { OutlineSummary } from "./OutlineSummary";
 
-const BLANK_OUTLINE: Outline = {
-  title: "", premise: "", genre: "drama", tone: "", time_and_world: "", central_conflict: "", synopsis: "",
-};
-
 /** How many act cards stand under the veil while the acts are drafted (the backend writes three to five). */
 const DRAFT_PLACEHOLDERS = 4;
+/** How long the notice about an act that cannot be opened yet stays. */
+const NOTICE_MS = 3500;
 
 /** Page "/play": the outline, then the acts with their progress. */
 export function PlayPage() {
   const state = useStoryState();
   const actions = useStoryActions();
   const navigate = useNavigate();
-  const { loaded, story, jobs, editingOutline, chatOpen, chats, typing, draft } = state;
+  const { loaded, story, jobs, chatOpen, chats, typing, draft } = state;
+  const notice = useTimedMessage(NOTICE_MS);
 
-  const showActs = !!story?.outline && !editingOutline && (story.acts.length > 0 || jobs.includes("acts"));
+  // once approved, the outline is final: the acts are shown and the outline stays a read-only summary
+  const showActs = !!story?.outline && (story.acts.length > 0 || jobs.includes("acts"));
   const chatKey = showActs ? "acts" : "outline";
+  // the chat is for the outline and the acts; once the acts are approved, the work goes on act by act
+  const hasChat = !!story?.outline && !story.acts_approved;
   const { chatOpened } = actions;
   useEffect(() => {
-    if (story?.outline) chatOpened(chatKey);
-  }, [chatKey, chatOpened, story?.outline]);
+    if (hasChat) chatOpened(chatKey);
+  }, [chatKey, chatOpened, hasChat]);
 
   if (!loaded) return null; // the Story Bible is still being read after a reload
 
-  const chat = (
+  const chat = hasChat && (
     <ChatPanel
       open={chatOpen}
       intro={
@@ -60,7 +65,7 @@ export function PlayPage() {
     return (
       <div className="absolute inset-0 flex">
         <div className="relative flex min-w-0 flex-1 flex-col bg-[radial-gradient(ellipse_900px_600px_at_0%_0%,#17130d_0%,transparent_60%)]">
-          <StoryHeader eyebrow="THE PLAY" tag="OUTLINE" title="A new play" sub="" chatOpen={false} onToggleChat={() => {}}>
+          <StoryHeader eyebrow="THE PLAY" tag="OUTLINE" title="A new play" sub="">
             <HeaderPill ghost onClick={() => navigate("/")}>
               <ArrowLeft />
               <span>NEW PREMISE</span>
@@ -74,7 +79,6 @@ export function PlayPage() {
     );
   }
 
-  const outline = story.outline ?? BLANK_OUTLINE;
   const header = playHeader(state, story, showActs, actions);
   const outlinePending = fieldsOf(state.pending, "outline:");
   const outlineHighlight = fieldsOf(state.highlight, "outline:");
@@ -88,8 +92,7 @@ export function PlayPage() {
           title={header.title}
           sub={header.sub}
           status={header.status}
-          chatOpen={chatOpen}
-          onToggleChat={actions.toggleChat}
+          chat={hasChat ? { open: chatOpen, onToggle: actions.toggleChat } : undefined}
         >
           {header.button && (
             <HeaderPill disabled={header.button.disabled} onClick={header.button.onClick}>
@@ -101,19 +104,18 @@ export function PlayPage() {
         <div className={cn("split", showActs && "split-on")}>
           <aside className="split-side" aria-label="Play outline">
             <div className="split-full scroll-thin box-border px-12 pt-5 pb-12">
-              {story.outline_changed && story.acts.length > 0 && (
-                <Notice className="mb-[14px] max-w-[1180px] min-w-[720px]">
-                  The acts were built from this outline. If you change it, check that the acts still fit: they are not
-                  rewritten on their own.
-                </Notice>
+              {/* the first outline: nothing under the veil, the fields fade in once it is written */}
+              {story.outline && (
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+                  <OutlineEditor
+                    outline={story.outline}
+                    readOnly={showActs}
+                    onChange={actions.editOutline}
+                    updating={typing === "outline" ? outlinePending : []}
+                    highlighted={outlineHighlight}
+                  />
+                </motion.div>
               )}
-              <OutlineEditor
-                outline={outline}
-                readOnly={!story.outline}
-                onChange={actions.editOutline}
-                updating={typing === "outline" ? outlinePending : []}
-                highlighted={outlineHighlight}
-              />
             </div>
             <GenerationVeil
               flat
@@ -122,7 +124,7 @@ export function PlayPage() {
               line="Reading your idea and the cast…"
             />
             <div className="split-mini scroll-thin box-border px-7 pt-[26px] pb-10">
-              {story.outline && <OutlineSummary outline={story.outline} onEdit={() => actions.setEditingOutline(true)} />}
+              {story.outline && <OutlineSummary outline={story.outline} />}
             </div>
           </aside>
 
@@ -143,7 +145,7 @@ export function PlayPage() {
                     ))
                   : story.acts.map((act) => (
                       <div key={act.number} className="slide-in">
-                        <ActCard {...actCardProps(state, story, act, actions)} />
+                        <ActCard {...actCardProps(state, story, act, actions, notice.show)} />
                       </div>
                     ))}
               </div>
@@ -152,6 +154,7 @@ export function PlayPage() {
         </div>
       </div>
       {chat}
+      <Toast open={notice.open}>{notice.message}</Toast>
     </div>
   );
 }
@@ -187,19 +190,16 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
           : { label: "WRITE THE OUTLINE", disabled: false, onClick: actions.generateOutline },
       };
     }
-    const hasActs = story.acts.length > 0;
     return {
       tag: "OUTLINE",
       title: outline.title || "Untitled play",
       sub: [genreLabel(outline.genre), firstClause(outline.tone)].filter(Boolean).join(" · "),
       status: false,
-      button: hasActs
-        ? { label: "BACK TO ACTS", disabled: false, onClick: () => actions.setEditingOutline(false) }
-        : {
-            label: "APPROVE OUTLINE",
-            disabled: !outline.title.trim() || !outline.synopsis.trim() || typing === "outline" || jobs.includes("acts"),
-            onClick: actions.approveOutline,
-          },
+      button: {
+        label: "APPROVE OUTLINE",
+        disabled: !outline.title.trim() || !outline.synopsis.trim() || typing === "outline" || jobs.includes("acts"),
+        onClick: actions.approveOutline,
+      },
     };
   }
 
@@ -238,7 +238,7 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
 }
 
 /** What one act card shows, from the Story Bible and the running requests. */
-function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: Actions): ActCardProps {
+function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: Actions, showNotice: (message: string) => void): ActCardProps {
   const { jobs, failed, pending, highlight, typing } = state;
   const n = act.number;
   const name = actName(n);
@@ -260,15 +260,17 @@ function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: A
     name,
     status: ACT_STATUS_LABEL[act.status],
     summary: act.summary,
-    onSummaryChange: veil ? undefined : (summary) => actions.editActSummary(n, summary),
+    // the summaries are final once the acts are approved
+    onSummaryChange: veil || story.acts_approved ? undefined : (summary) => actions.editActSummary(n, summary),
     veil,
     revising: typing === "acts" && pending.includes(`act:${n}`),
     highlighted: highlight.includes(`act:${n}`),
     dimmed: story.acts_approved && !!current && n > current.number,
     open: openable ? { label: read ? "READ" : "OPEN", aria: `${read ? "Read" : "Open"} ${name}`, onOpen: () => actions.openAct(n) } : null,
     retry: waitingToStage && failed.includes(`structure:${n}`) ? { label: `STAGE ACT ${word}`, onRetry: () => actions.stageAct(n) } : null,
-    notice: act.summary_changed
-      ? `The scenes of ${name} were built from the earlier version of this summary. If you keep this change, check that they still fit.`
-      : undefined,
+    onLockedClick:
+      story.acts_approved && !isOpenAct(story, n)
+        ? () => showNotice(`${name} can be opened only after the text of ${actName(n - 1)} is approved.`)
+        : undefined,
   };
 }

@@ -7,6 +7,7 @@ import { isIncomplete, openAfterCut, openAfterMove } from "@/features/story/mode
 import type { Act, StoryBible } from "@/features/story/model/types";
 import { paths } from "@/features/story/paths";
 import { useStoryActions, useStoryState } from "@/features/story/store/story-context";
+import { useTimedMessage } from "@/shared/hooks/use-timed-message";
 import type { StoryState } from "@/features/story/store/story-reducer";
 import { cn } from "@/shared/lib/utils";
 import { ChatPanel } from "@/shared/ui/chat/ChatPanel";
@@ -15,6 +16,7 @@ import { HeaderPill } from "@/shared/ui/HeaderPill";
 import { ArrowDown, ArrowLeft, ArrowUp, Close, Pen } from "@/shared/ui/icons";
 import { Notice } from "@/shared/ui/Notice";
 import { RoundIconButton } from "@/shared/ui/RoundIconButton";
+import { Toast } from "@/shared/ui/Toast";
 import { StoryHeader } from "../StoryHeader";
 import { sceneAnchor } from "./anchors";
 import { Manuscript } from "./Manuscript";
@@ -22,6 +24,9 @@ import { AddingSceneCard, SceneCard } from "./SceneCard";
 import { ScenePlanCard, type CastChip } from "./ScenePlanCard";
 
 type Actions = ReturnType<typeof useStoryActions>;
+
+/** How long the notice about a scene that cannot be edited yet stays. */
+const NOTICE_MS = 3500;
 
 /** Page "/play/acts/:n": the scenes of one act, their plans, then its text. */
 export function ActPage() {
@@ -32,6 +37,7 @@ export function ActPage() {
   const { loaded, story, jobs, chatOpen, chats, typing, draft, pending, highlight, editingScenes } = state;
   // structure scenes whose editor is open; a scene added by hand opens with it
   const [open, setOpen] = useState<Set<number>>(new Set());
+  const notice = useTimedMessage(NOTICE_MS);
 
   const { actOpened } = actions;
   const hasStory = !!story;
@@ -153,6 +159,11 @@ export function ActPage() {
           planning={planning}
           dimmed={!planning}
           updating={isPending(target)}
+          onLockedClick={
+            waiting && !planning
+              ? () => notice.show(`Scene ${no} can be edited only after Scene ${no - 1} is approved.`)
+              : undefined
+          }
           tools={
             !planning && (
               <span className="pt-1 font-sans text-[10px] tracking-[1.5px] whitespace-nowrap text-muted-2">
@@ -204,8 +215,7 @@ export function ActPage() {
           title={name}
           sub={header.sub}
           status={header.status}
-          chatOpen={chatOpen}
-          onToggleChat={actions.toggleChat}
+          chat={{ open: chatOpen, onToggle: actions.toggleChat }}
         >
           <HeaderPill ghost onClick={actions.goToPlay}>
             <ArrowLeft />
@@ -237,9 +247,6 @@ export function ActPage() {
                   </span>
                 </div>
 
-                {act.summary_changed && (
-                  <Notice>The scenes were built from an earlier version of the act summary. Check that they still fit.</Notice>
-                )}
                 {act.scenes_changed && stage === "plans" && (
                   <Notice>The text of {name} was written from these scenes. If you change them, write the act again.</Notice>
                 )}
@@ -332,6 +339,7 @@ export function ActPage() {
         onDraftChange={actions.setDraft}
         onSend={() => void actions.sendMessage({ kind: chatKind, act: n })}
       />
+      <Toast open={notice.open}>{notice.message}</Toast>
     </div>
   );
 }

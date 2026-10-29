@@ -33,8 +33,6 @@ export interface StoryState {
   highlight: string[];
   chatOpen: boolean;
   draft: string;
-  /** EDIT OUTLINE was pressed after the acts exist: the outline editor is shown with BACK TO ACTS. */
-  editingOutline: boolean;
   /** Acts whose page shows the scene plans instead of the written text (EDIT SCENES). */
   editingScenes: number[];
 }
@@ -50,7 +48,6 @@ export const initialState: StoryState = {
   highlight: [],
   chatOpen: true,
   draft: "",
-  editingOutline: false,
   editingScenes: [],
 };
 
@@ -73,7 +70,6 @@ export type Action =
   | { type: "replyReceived"; key: ChatKey; text: string; updated: string[]; highlight: string[] }
   | { type: "replyFailed"; key: ChatKey }
   | { type: "clearHighlight" }
-  | { type: "setEditingOutline"; editing: boolean }
   | { type: "setEditingScenes"; number: number; editing: boolean };
 
 export function reducer(state: StoryState, action: Action): StoryState {
@@ -151,8 +147,6 @@ export function reducer(state: StoryState, action: Action): StoryState {
       return { ...state, typing: state.typing === action.key ? null : state.typing, pending: [] };
     case "clearHighlight":
       return { ...state, highlight: [] };
-    case "setEditingOutline":
-      return { ...state, editingOutline: action.editing };
     case "setEditingScenes":
       return {
         ...state,

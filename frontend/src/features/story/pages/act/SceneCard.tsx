@@ -18,12 +18,28 @@ interface SceneCardProps {
   planning?: boolean;
   dimmed?: boolean;
   notice?: string;
+  /** The scene cannot be edited yet: a click explains why. */
+  onLockedClick?(): void;
 }
 
 /** A scene in short: italic number, place in serif with its note, who is on stage, what happens. */
-export function SceneCard({ number, place, placeNotes, who, whatHappens, tools, updating, highlighted, planning, dimmed, notice }: SceneCardProps) {
+export function SceneCard({
+  number,
+  place,
+  placeNotes,
+  who,
+  whatHappens,
+  tools,
+  updating,
+  highlighted,
+  planning,
+  dimmed,
+  notice,
+  onLockedClick,
+}: SceneCardProps) {
   return (
     <article
+      onClick={onLockedClick}
       className={cn(
         "relative grid animate-fade-up grid-cols-[44px_minmax(0,1fr)_auto] gap-x-4 rounded-[10px] border border-line bg-card py-[18px] pr-5 pl-4",
         "transition-[border-color,background-color,box-shadow] duration-200 hover:border-line-hover",

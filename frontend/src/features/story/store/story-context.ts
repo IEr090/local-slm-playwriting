@@ -25,14 +25,13 @@ export interface StoryActions {
   /** Writes the outline again after a failed generation. */
   generateOutline(): void;
   editOutline(patch: Partial<Outline>): void;
-  /** APPROVE OUTLINE: saves the outline, shows the acts and drafts them. */
+  /** APPROVE OUTLINE: saves the outline, shows the acts and drafts them; the outline is final from then on. */
   approveOutline(): void;
-  /** EDIT OUTLINE / BACK TO ACTS once the acts exist; nothing is generated again. */
-  setEditingOutline(editing: boolean): void;
 
   // ---------- acts ----------
+  /** Only before the acts are approved. */
   editActSummary(n: number, summary: string): void;
-  /** APPROVE ACTS: the first act is then staged on its own. */
+  /** APPROVE ACTS: the summaries are final and the first act is then staged on its own. */
   approveActs(): void;
   /** Generates the structure of an act again after a failed attempt. */
   stageAct(n: number): void;

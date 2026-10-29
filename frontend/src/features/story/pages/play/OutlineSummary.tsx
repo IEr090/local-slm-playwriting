@@ -1,9 +1,8 @@
 import { genreLabel } from "@/features/story/model/labels";
 import type { Outline } from "@/features/story/model/types";
-import { HeaderPill } from "@/shared/ui/HeaderPill";
 
-/** The approved outline, collapsed into the left column next to the acts. */
-export function OutlineSummary({ outline: o, onEdit }: { outline: Outline; onEdit(): void }) {
+/** The approved outline, collapsed into the left column next to the acts; it is final and read-only. */
+export function OutlineSummary({ outline: o }: { outline: Outline }) {
   const rows: [string, string, string][] = [
     ["TONE", o.tone, "line-clamp-4"],
     ["TIME & WORLD", o.time_and_world, "line-clamp-4"],
@@ -12,12 +11,7 @@ export function OutlineSummary({ outline: o, onEdit }: { outline: Outline; onEdi
   ];
   return (
     <>
-      <div className="flex items-center justify-between gap-[10px]">
-        <span className="font-sans text-[11px] tracking-[2px] text-muted-2">THE PLAY</span>
-        <HeaderPill ghost small onClick={onEdit}>
-          EDIT OUTLINE
-        </HeaderPill>
-      </div>
+      <span className="font-sans text-[11px] tracking-[2px] text-muted-2">THE PLAY</span>
       <h2 className="mt-[14px] mb-0 font-serif text-[32px] leading-[1.05] font-medium">{o.title || "Untitled play"}</h2>
       <div className="mt-[10px] font-serif text-[19px] leading-[1.3] text-gold-soft italic">{o.premise}</div>
       <div className="dotted-rule mt-5 mb-4" />

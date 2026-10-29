@@ -438,7 +438,6 @@ export function StoryProvider({ children }: { children: ReactNode }) {
 
   const approveOutline = useCallback(async () => {
     await flush("outline");
-    dispatch({ type: "setEditingOutline", editing: false });
     void runStoryJob("acts", (signal) => api.generateActs({ signal }));
   }, [flush, runStoryJob]);
 
@@ -570,7 +569,6 @@ export function StoryProvider({ children }: { children: ReactNode }) {
       generateOutline,
       editOutline,
       approveOutline: () => void approveOutline(),
-      setEditingOutline: (editing) => dispatch({ type: "setEditingOutline", editing }),
       editActSummary,
       approveActs: () => void approveActs(),
       stageAct,

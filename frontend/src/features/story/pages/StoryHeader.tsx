@@ -12,13 +12,13 @@ interface StoryHeaderProps {
   status?: boolean;
   /** Pills left of the chat toggle. */
   children?: ReactNode;
-  chatOpen: boolean;
-  onToggleChat(): void;
+  /** The AI chat toggle; left out on a page without a chat. */
+  chat?: { open: boolean; onToggle(): void };
 }
 
 /** Header of the play and act pages: eyebrow + status tag, serif title, sub line, pills and the chat toggle. */
-export function StoryHeader({ eyebrow, tag, title, sub, status = false, children, chatOpen, onToggleChat }: StoryHeaderProps) {
-  const chatLabel = chatOpen ? "Hide AI chat" : "Show AI chat";
+export function StoryHeader({ eyebrow, tag, title, sub, status = false, children, chat }: StoryHeaderProps) {
+  const chatLabel = chat?.open ? "Hide AI chat" : "Show AI chat";
   return (
     <header className="relative flex flex-wrap items-end justify-between gap-6 border-b border-dotted border-line-strong px-12 pt-[34px] pb-[18px]">
       <div className="min-w-0">
@@ -31,9 +31,11 @@ export function StoryHeader({ eyebrow, tag, title, sub, status = false, children
       </div>
       <div className="mb-1 flex shrink-0 items-center gap-[10px]">
         {children}
-        <RoundIconButton active={chatOpen} onClick={onToggleChat} aria-label={chatLabel} title={chatLabel}>
-          <Spark />
-        </RoundIconButton>
+        {chat && (
+          <RoundIconButton active={chat.open} onClick={chat.onToggle} aria-label={chatLabel} title={chatLabel}>
+            <Spark />
+          </RoundIconButton>
+        )}
       </div>
     </header>
   );
