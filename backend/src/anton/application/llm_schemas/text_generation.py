@@ -9,20 +9,35 @@ class GeneratedLine(BaseModel):
     text: str = Field(description="What the character says, or the stage direction itself.")
 
 
+# Without a lower limit a small model writes a scene of five lines or of stage directions only. The limit is
+# only part of the JSON schema sent to the model, so shorter texts from elsewhere (tests, edits) stay valid.
+MIN_SCENE_LINES = 20
+
+
 class GeneratedSceneText(BaseModel):
     """Represent the dialogue and stage directions of one scene as the language model writes them."""
 
-    lines: list[GeneratedLine] = Field(description="The scene from beginning to end. Start with a stage direction that sets the scene.")
+    lines: list[GeneratedLine] = Field(
+        description="The scene from beginning to end, mostly speeches. Start with a stage direction that sets the scene.",
+        json_schema_extra={"minItems": MIN_SCENE_LINES},
+    )
 
 
-class EditedSceneText(GeneratedSceneText):
-    """Represent one scene text after the agreed changes, as the language model returns it."""
+class LineEdit(BaseModel):
+    """Represent one agreed change of a scene text: a line and the lines that take its place."""
 
     scene_number: int = Field(description="Number of the scene, exactly as in the input.")
+    old_line: str = Field(
+        description="The line to change, copied exactly from the scene text, e.g. 'MARGIT: Of course you didn't.'. "
+        "Empty string to add the new lines at the end of the scene.",
+    )
+    new_lines: list[GeneratedLine] = Field(description="The lines that take the place of the old line, in order. Empty to cut the line.")
 
 
-class EditedSceneTexts(RootModel[list[EditedSceneText]]):
-    """Represent only the scene texts the agreed changes are about."""
+# A small model that has to rewrite a whole scene often returns only the lines it changed and the rest of the
+# scene is lost, so it returns only the edits and every other line stays as it is.
+class EditedSceneTexts(RootModel[list[LineEdit]]):
+    """Represent the agreed changes of the scene texts, one edit per changed line."""
 
 
 class GeneratedHistoryEntry(BaseModel):

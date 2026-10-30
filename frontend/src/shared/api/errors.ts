@@ -8,10 +8,13 @@ export interface ApiErrorInfo {
 
 export class ApiError extends Error {
   readonly detail: string;
-  constructor(message: string, detail: string) {
+  /** HTTP status of the answer; undefined when the backend was not reached or the error is not from it. */
+  readonly status?: number;
+  constructor(message: string, detail: string, status?: number) {
     super(message);
     this.name = "ApiError";
     this.detail = detail;
+    this.status = status;
   }
 }
 

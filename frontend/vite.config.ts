@@ -13,6 +13,20 @@ const proxy = {
 export default defineConfig({
   server: { proxy },
   preview: { proxy },
+  // libraries in their own chunks, so no chunk grows over the 500 kB warning and the app code caches apart
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/ },
+            { name: 'motion', test: /node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/ },
+            { name: 'vendor', test: /node_modules[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 
-/** Small pill message at the bottom centre that fades up. */
+/** Small pill message at the bottom centre that fades up; a calm notice, not an error. */
 export function Toast({ open, children }: { open: boolean; children: React.ReactNode }) {
   return (
     <AnimatePresence>

@@ -66,15 +66,16 @@ class StoryRouteTest(TestCase):
         self.assertEqual(response.json()["outline"]["title"], "The Salt House")
         self.assertFalse(response.json()["outline_changed"])
 
-    def test_second_generation_returns_409(self) -> None:
-        """Reject generating the outline twice with a clear message."""
+    def test_generation_after_acts_returns_409(self) -> None:
+        """Reject writing the outline again once the acts are built from it, with a clear message."""
         self.start_play()
         self.client.post("/api/story/outline/generate")
+        self.client.post("/api/story/acts/generate")
 
         response = self.client.post("/api/story/outline/generate")
 
         self.assertEqual(response.status_code, 409)
-        self.assertIn("outline already exists", response.json()["message"])
+        self.assertIn("acts are already built", response.json()["message"])
 
     def test_edit_before_outline_returns_409(self) -> None:
         """Reject editing the outline before it is generated."""

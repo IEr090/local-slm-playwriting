@@ -38,3 +38,16 @@ export function Orb({ variant = "logo", className }: OrbProps) {
     </span>
   );
 }
+
+/** The larger "A" of the generation veil: two dotted rings turning in opposite directions around a glowing core. */
+export function VeilOrb({ className }: { className?: string }) {
+  return (
+    <span aria-hidden className={cn("relative block size-[46px] shrink-0", className)}>
+      <span className="absolute -inset-[7px] animate-ring-b rounded-full border border-dotted border-gold/35" />
+      <span className="absolute inset-0 animate-ring-c rounded-full border border-dotted border-gold" />
+      <span className="orb-core absolute inset-[7px] flex animate-veil-glow items-center justify-center rounded-full border border-gold/55 font-serif text-[19px] text-gold-light italic">
+        A
+      </span>
+    </span>
+  );
+}

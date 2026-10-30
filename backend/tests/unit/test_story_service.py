@@ -114,13 +114,24 @@ class GenerateOutlineTest(IsolatedAsyncioTestCase):
         self.assertNotIn("biography", prompt)
         self.assertIn("goal", OUTLINE_CAST_FIELDS)
 
-    async def test_rejects_second_generation(self) -> None:
-        """Reject generating the outline again once it exists."""
+    async def test_writes_outline_again_before_acts(self) -> None:
+        """Write the outline anew while no acts are built from it."""
         await self.service.generate_outline()
 
+        story = await self.service.generate_outline()
+
+        self.assertEqual(story.outline, make_outline())
+        self.assertEqual(len(self.client.calls), 2)
+
+    async def test_rejects_generation_once_acts_exist(self) -> None:
+        """Reject writing the outline again once the acts are built from it."""
+        service, client, *_ = make_service(
+            GENERATED_OUTLINE, story=StoryBible(user_input=USER_INPUT, outline=make_outline(), acts=make_acts()), cast=make_cast(),
+        )
+
         with self.assertRaises(StoryOrderError):
-            await self.service.generate_outline()
-        self.assertEqual(len(self.client.calls), 1)
+            await service.generate_outline()
+        self.assertEqual(client.calls, [])
 
     async def test_raises_without_cast(self) -> None:
         """Report that the cast is missing before calling the model."""

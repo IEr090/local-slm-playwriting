@@ -5,19 +5,30 @@ from anton.application.agents.chat_edit_agent import ChatEditAgent, create_check
 from anton.application.agents.text_target import TextTarget
 from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.text_generation import (
-    EditedSceneText,
     EditedSceneTexts,
     GeneratedHistory,
     GeneratedHistoryEntry,
     GeneratedLine,
     GeneratedSceneText,
+    LineEdit,
 )
-from anton.application.mappers.text_mapper import ending, format_lines, to_history_entries
+from anton.application.agents.scene_targets import SceneView
+from anton.application.mappers.text_mapper import (
+    apply_line_edits,
+    ending,
+    format_lines,
+    looping_phrases,
+    narrated_lines,
+    repeated_lines,
+    to_history_entries,
+    unknown_speakers,
+    without_repeats,
+)
 from anton.application.scene_writer import SceneWriter
 from anton.application.text_service import TextService
 from anton.domain.models import Cast, CharacterHistoryEntry, SceneText
 from anton.errors import SceneNotFoundError, StoryOrderError
-from tests.unit.fakes import FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository
+from tests.unit.fakes import FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, ScriptedSLMClient
 from tests.unit.test_scene_service import make_characters, make_scene, make_story
 
 
@@ -35,6 +46,11 @@ def make_text_story(status: str = "scenes_approved", texts: bool = True):
     if texts:
         story.acts[0].scene_texts = [SceneText(scene_number=1, text="ELIAS: One."), SceneText(scene_number=2, text="ELIAS: Two.")]
     return story
+
+
+def make_view() -> SceneView:
+    """Create a scene as the writer sees it."""
+    return SceneView(number=1, place="The kitchen", place_notes="", characters=["Elias Hale"], what_happens="Elias arrives.")
 
 
 def make_service(*responses, story=None, cast: Cast | None = None):
@@ -78,27 +94,80 @@ class FormatTest(TestCase):
         self.assertEqual(entries, {"elias": [CharacterHistoryEntry(act_number=1, scene_number=2, change="Learns that Margit wrote to Agnes.")]})
 
 
+SCENE = "(Night.)\n\nELIAS (trembling): The lens is clear. The storm did no harm.\n\nAVA: The plans are ready.\n\n(Darkness.)"
+SHARPER = GeneratedLine(character="Elias", parenthetical="", text="The lens is clear.")
+
+
+def line_edit(old_line: str, *new_lines: GeneratedLine, scene_number: int = 1) -> LineEdit:
+    """Create an edit of one line of a scene."""
+    return LineEdit(scene_number=scene_number, old_line=old_line, new_lines=list(new_lines))
+
+
+class LineEditTest(TestCase):
+    """Test applying the model's edits of single lines to a scene text."""
+
+    def test_replaces_named_line_and_keeps_the_others(self) -> None:
+        """Put the new line in place of the old one; every other line stays."""
+        result = apply_line_edits(SCENE, [line_edit("ELIAS (trembling): The lens is clear. The storm did no harm.", SHARPER)])
+
+        self.assertEqual(result, "(Night.)\n\nELIAS: The lens is clear.\n\nAVA: The plans are ready.\n\n(Darkness.)")
+
+    def test_finds_line_copied_not_quite_exactly(self) -> None:
+        """Take the line with most of the words when the model left out the note or changed the case."""
+        result = apply_line_edits(SCENE, [line_edit("elias: the lens is clear. the storm did no harm", SHARPER)])
+
+        self.assertIn("ELIAS: The lens is clear.\n\nAVA", result)
+        self.assertEqual(result.count("\n\n"), 3)
+
+    def test_ignores_line_that_is_not_in_the_scene(self) -> None:
+        """Change nothing when the old line is not in the scene."""
+        self.assertEqual(apply_line_edits(SCENE, [line_edit("MARGIT: Something else entirely.", SHARPER)]), SCENE)
+
+    def test_cuts_inserts_and_appends_lines(self) -> None:
+        """Cut a line with no new lines, add one after the old line, append with an empty old line."""
+        dark = GeneratedLine(character="", parenthetical="", text="Dark.")
+        ava = GeneratedLine(character="AVA", parenthetical="", text="The plans are ready.")
+        late = GeneratedLine(character="AVA", parenthetical="", text="Too late.")
+
+        result = apply_line_edits(SCENE, [line_edit("(Night.)"), line_edit("AVA: The plans are ready.", ava, late), line_edit("", dark)])
+
+        self.assertEqual(
+            result,
+            "ELIAS (trembling): The lens is clear. The storm did no harm.\n\nAVA: The plans are ready.\n\nAVA: Too late."
+            "\n\n(Darkness.)\n\n(Dark.)",
+        )
+
+
 class TextTargetTest(TestCase):
     """Test how the act agent sees and changes the text."""
 
-    def test_replaces_only_edited_scene_text(self) -> None:
-        """Rewrite the scene the model edited in play format and keep the others."""
+    def test_applies_edits_to_their_scene_only(self) -> None:
+        """Edit the scene the model named and keep the others; numbers the act does not have are ignored."""
         texts = [SceneText(scene_number=1, text="ELIAS: One."), SceneText(scene_number=2, text="ELIAS: Two.")]
-        edited = EditedSceneTexts([EditedSceneText(scene_number=2, lines=SCENE_TEXT.lines)])
+        edited = EditedSceneTexts([line_edit("ELIAS: Two.", SHARPER, scene_number=2), line_edit("ELIAS: Two.", SHARPER, scene_number=9)])
 
         result = TextTarget().apply(texts, edited)
 
-        self.assertEqual(result, [texts[0], SceneText(scene_number=2, text=WRITTEN)])
+        self.assertEqual(result, [texts[0], SceneText(scene_number=2, text="ELIAS: The lens is clear.")])
 
-    def test_keeps_text_when_edit_is_empty(self) -> None:
-        """Keep a scene text when the model returned no lines for it."""
+    def test_keeps_text_when_there_are_no_edits(self) -> None:
+        """Keep the scene texts when the model returned no edits."""
         texts = [SceneText(scene_number=1, text="ELIAS: One.")]
 
-        self.assertEqual(TextTarget().apply(texts, EditedSceneTexts([EditedSceneText(scene_number=1, lines=[])])), texts)
+        self.assertEqual(TextTarget().apply(texts, EditedSceneTexts([])), texts)
 
 
 class GenerateTextTest(IsolatedAsyncioTestCase):
     """Test writing the text of an act scene by scene."""
+
+    async def test_new_text_starts_the_act_chat_anew(self) -> None:
+        """Forget the chat of the act page, which was about the scenes and an earlier text."""
+        service, *_ = make_service(SCENE_TEXT, ChatTurn(reply="Which scene?", apply_changes=None), story=make_text_story(texts=False))
+        await service.text_agent.send("act-1", [], "Make it sharper.")
+
+        await service.generate_text(1)
+
+        self.assertEqual(await service.text_agent.history("act-1"), [])
 
     async def test_writes_every_scene_and_remembers_scenes(self) -> None:
         """Store one text per scene in play format and the scenes it was written from."""
@@ -169,7 +238,7 @@ class EditAndReviseTextTest(IsolatedAsyncioTestCase):
 
     async def test_revises_named_scene_without_saving(self) -> None:
         """Answer with the edited scene text and leave the saved text unchanged."""
-        edited = EditedSceneTexts([EditedSceneText(scene_number=2, lines=SCENE_TEXT.lines)])
+        edited = EditedSceneTexts([line_edit("ELIAS: Two.", *SCENE_TEXT.lines, scene_number=2)])
         story = make_text_story()
         service, client, repository, _ = make_service(ChatTurn(reply="Applying.", apply_changes="scene 2 ..."), edited, story=story)
 
@@ -202,7 +271,7 @@ class ApproveTextTest(IsolatedAsyncioTestCase):
         elias = cast_repository.load().characters[1]
         self.assertEqual([(entry.act_number, entry.scene_number) for entry in elias.history], [(1, 1), (1, 2)])
         self.assertEqual(cast_repository.load().characters[0].history, [])
-        self.assertEqual(json.loads(client.calls[0]["user_prompt"]), {"scene_text": "ELIAS: One.", "characters": ["Elias Hale"]})
+        self.assertEqual(json.loads(client.calls[0]["user_prompt"]), {"scene_text": "ELIAS: One.", "characters": ["Elias Hale"], "language": "English"})
 
     async def test_replaces_old_entries_of_the_act(self) -> None:
         """Remove the entries of an act written before and keep the entries of other acts."""
@@ -232,3 +301,93 @@ class ApproveTextTest(IsolatedAsyncioTestCase):
         with self.assertRaises(StoryOrderError) as raised:
             await service.approve_text(1)
         self.assertIn("already approved", str(raised.exception))
+
+
+ON_STAGE = [{"name": "Elias", "surname": "Hale"}, {"name": "Margit", "surname": "Hale"}]
+
+
+class SpeakerTest(IsolatedAsyncioTestCase):
+    """Test that only the characters on stage speak in a written scene."""
+
+    def test_finds_speakers_who_are_not_on_stage(self) -> None:
+        """Accept first names, surnames and full names in any case; name the others once."""
+        lines = [
+            GeneratedLine(character="ELIAS", parenthetical="", text="One."),
+            GeneratedLine(character="Margit Hale", parenthetical="", text="Two."),
+            GeneratedLine(character="", parenthetical="", text="Night."),
+            GeneratedLine(character="HOUSEKEEPER", parenthetical="", text="Three."),
+            GeneratedLine(character="Housekeeper", parenthetical="", text="Four."),
+        ]
+
+        self.assertEqual(unknown_speakers(lines, ON_STAGE), ["HOUSEKEEPER"])
+
+    async def test_writes_again_when_a_stranger_speaks(self) -> None:
+        """Ask once more, naming who may speak, and take the better answer."""
+        stranger = GeneratedSceneText(lines=[GeneratedLine(character="Housekeeper", parenthetical="", text="Tea?")])
+        client = ScriptedSLMClient(stranger, SCENE_TEXT)
+
+        text = await SceneWriter(client).write({}, "", make_view(), {}, ON_STAGE, "")
+
+        self.assertEqual(text, WRITTEN)
+        self.assertIn("Do not let Housekeeper speak.", client.calls[1]["user_prompt"])
+
+    async def test_keeps_first_answer_when_the_second_is_no_better(self) -> None:
+        """Keep the first text when the second try still lets the stranger speak."""
+        stranger = GeneratedSceneText(lines=[GeneratedLine(character="Housekeeper", parenthetical="", text="Tea?")])
+
+        text = await SceneWriter(ScriptedSLMClient(stranger, stranger)).write({}, "", make_view(), {}, ON_STAGE, "")
+
+        self.assertEqual(text, "HOUSEKEEPER: Tea?")
+
+
+class DirectTextChangesTest(TestCase):
+    """Test applying agreed text changes written as `scene N replace "old" with "new"`."""
+
+    def test_replaces_quoted_line(self) -> None:
+        """Replace the quoted line in its scene and keep the others."""
+        texts = [SceneText(scene_number=1, text=SCENE)]
+        changes = 'scene 1 replace "AVA: The plans are ready." with "AVA (quietly): Too late."'
+
+        result = TextTarget().parse_changes(texts, changes)
+
+        self.assertEqual(result[0].text, SCENE.replace("AVA: The plans are ready.", "AVA (quietly): Too late."))
+
+    def test_leaves_other_wording_to_the_model(self) -> None:
+        """Return None for changes that are not written as replacements."""
+        self.assertIsNone(TextTarget().parse_changes([SceneText(scene_number=1, text=SCENE)], "make it sharper"))
+
+
+class TextDefectTest(IsolatedAsyncioTestCase):
+    """Test finding repeated and narrated lines in a written scene."""
+
+    def test_finds_repeated_and_narrated_lines(self) -> None:
+        """Count word-for-word repeats and speeches that tell about the speaker by name."""
+        lines = [
+            GeneratedLine(character="ELIAS", parenthetical="", text="We stay."),
+            GeneratedLine(character="MARGIT", parenthetical="", text="Elias, we go."),
+            GeneratedLine(character="ELIAS", parenthetical="", text="Elias quickly checks the papers to be sure."),
+            GeneratedLine(character="ELIAS", parenthetical="", text="We  stay."),
+        ]
+
+        self.assertEqual(repeated_lines(lines), 1)
+        near = [GeneratedLine(character="E", parenthetical="", text=text) for text in ("I have to. The storm is coming.", "No. I have to. The storm is coming.", "Then we stay and wait for the boat.")]
+        self.assertEqual(repeated_lines(near), 1)
+        threat = "if the repairs are not done by tomorrow I lock the room"
+        loop = [GeneratedLine(character="I", parenthetical="", text=f"{start}, {threat}.") for start in ("Listen", "I am not threatening", "It is my family")]
+        self.assertIn("i lock the room", " ".join(looping_phrases(loop)))
+        self.assertEqual(looping_phrases(loop[:2]), [])
+        # the second speech is the first one again with another opening, the third brings the phrase back once more
+        self.assertEqual([line.text for line in without_repeats(loop)], [loop[0].text])
+        self.assertEqual(narrated_lines(lines, ON_STAGE), 1)
+        self.assertEqual([line.text for line in without_repeats(lines)], ["We stay.", "Elias, we go.", "Elias quickly checks the papers to be sure."])
+
+    async def test_writes_again_when_lines_repeat(self) -> None:
+        """Ask once more when the scene repeats itself, and drop exact repeats from the text."""
+        line = GeneratedLine(character="Elias", parenthetical="", text="We stay.")
+        looping = GeneratedSceneText(lines=[line, line, line])
+        client = ScriptedSLMClient(looping, looping)
+
+        text = await SceneWriter(client).write({}, "", make_view(), {}, ON_STAGE, "")
+
+        self.assertEqual(text, "ELIAS: We stay.")
+        self.assertIn("every line must be new", client.calls[1]["user_prompt"])

@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Navigate, useLocation, useRoutes } from "react-router";
 import { characterRoutes } from "@/features/characters/routes";
+import { storyRoutes } from "@/features/story/routes";
 import { useErrors } from "@/shared/errors/errors-context";
 import { ErrorBanner } from "@/shared/ui/ErrorBanner";
 
 /** All pages of the app; a new feature adds its routes here. Unknown URLs go to the start page. */
-const routes = [...characterRoutes, { path: "*", element: <Navigate to="/" replace /> }];
+const routes = [...characterRoutes, ...storyRoutes, { path: "*", element: <Navigate to="/" replace /> }];
 
 export default function App() {
   const location = useLocation();

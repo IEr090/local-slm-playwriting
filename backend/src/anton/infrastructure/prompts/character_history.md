@@ -12,6 +12,7 @@ The user provides a JSON object with two keys:
 
 - `scene_text`: The text of the scene in play format: speeches as `NAME (note): text`, stage directions in parentheses.
 - `characters`: The names of the characters on stage.
+- `language`: The language to write in.
 
 # FIELDS
 
@@ -24,7 +25,8 @@ The user provides a JSON object with two keys:
 - Write down only what happens in this scene. Do not guess what happens later.
 - Leave out characters for whom nothing changed.
 - Write facts the next scenes need to know, not an interpretation of the scene.
-- Write in the language of the scene.
+- Write the change, not the action: "Learns that her brother has hidden the will" — not "Looks at her brother" or "Adjusts the table". A character who only did something without learning, deciding, gaining or losing anything did not change.
+- Write in the language named in `language`.
 
 # OUTPUT
 

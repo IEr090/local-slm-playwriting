@@ -6,7 +6,10 @@ import { paths } from "@/features/characters/paths";
 import { ApiError } from "@/shared/api/errors";
 import { useErrors } from "@/shared/errors/errors-context";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
-import { ChatPanel } from "./chat/ChatPanel";
+import { ChatPanel } from "@/shared/ui/chat/ChatPanel";
+import type { ChatBubble } from "@/shared/ui/chat/ChatMessage";
+import { FIELD_LABEL } from "@/features/characters/model/labels";
+import type { ChatMessage } from "@/features/characters/model/types";
 import { DetailHeader } from "./DetailHeader";
 import { FieldGrid } from "./FieldGrid";
 import { LeaveDialog } from "./LeaveDialog";
@@ -82,8 +85,13 @@ export function DetailPage() {
       </div>
       <ChatPanel
         open={chatOpen}
-        characterName={character.name || "this character"}
-        messages={chats[character.id] ?? []}
+        intro={
+          <>
+            Describe what should change about {character.name || "this character"}, for example “make her more cynical”
+            or “give him a secret”. The Character Agent will rewrite the relevant fields.
+          </>
+        }
+        messages={(chats[character.id] ?? []).map(toBubble)}
         typing={aiTypingFor === character.id}
         draft={draft}
         onDraftChange={setDraft}
@@ -100,4 +108,10 @@ export function DetailPage() {
       />
     </div>
   );
+}
+
+/** A chat message as a bubble: the AI's changed fields become their labels. */
+function toBubble(message: ChatMessage): ChatBubble {
+  if (message.role === "user") return message;
+  return { role: "ai", text: message.text, updated: [...new Set(message.changed_fields.map((f) => FIELD_LABEL[f]))] };
 }

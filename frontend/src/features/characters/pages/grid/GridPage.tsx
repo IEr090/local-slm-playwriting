@@ -1,17 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { Pill, GoldPill } from "@/shared/ui/Pill";
-import { Toast } from "@/shared/ui/Toast";
 import { useCastActions, useCastState } from "@/features/characters/store/cast-context";
+import { paths as storyPaths } from "@/features/story/paths";
 import { CharacterCardView } from "./CharacterCardView";
-
-/** "Continue" toast: shown for 3 s. */
-const TOAST_MS = 3000;
 
 /** Page "/cast": the cast grid "Dramatis Personae". */
 export function GridPage() {
   const { cast, cards, saving, updating } = useCastState();
   const { newPremise, addBlank, openCharacter } = useCastActions();
-  const [toast, showToast] = useTimedFlag(TOAST_MS);
+  const navigate = useNavigate();
 
   return (
     <div className="absolute inset-0">
@@ -22,9 +19,11 @@ export function GridPage() {
         <div className="flex items-center gap-[14px]">
           <Pill onClick={newPremise}>← New premise</Pill>
           <Pill onClick={() => void addBlank()}>+ Add character</Pill>
-          <GoldPill onClick={showToast} className="px-5 py-[10px] text-xs tracking-[1px]">
-            Continue →
-          </GoldPill>
+          {cast.length > 0 && (
+            <GoldPill onClick={() => navigate(storyPaths.play)} className="px-5 py-[10px] text-xs tracking-[1.5px]">
+              WRITE THE PLAY →
+            </GoldPill>
+          )}
         </div>
       </div>
 
@@ -45,21 +44,6 @@ export function GridPage() {
           />
         ))}
       </div>
-
-      <Toast open={toast}>Cast approved. Next stage, Plot, arrives in Milestone 3.</Toast>
     </div>
   );
-}
-
-/** A flag that turns itself off after `ms`; calling `show` again restarts the timer. */
-function useTimedFlag(ms: number): [boolean, () => void] {
-  const [on, setOn] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const show = () => {
-    clearTimeout(timer.current);
-    setOn(true);
-    timer.current = setTimeout(() => setOn(false), ms);
-  };
-  return [on, show];
 }

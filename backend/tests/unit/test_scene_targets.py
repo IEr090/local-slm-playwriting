@@ -1,10 +1,17 @@
 from unittest import IsolatedAsyncioTestCase, TestCase
 
 from anton.application.agents.scene_targets import SceneBoard, SceneView, ScenesTarget, StructureTarget
-from anton.application.llm_schemas.scene_generation import EditedScene, EditedScenes, GeneratedPlace
+from anton.application.llm_schemas.scene_generation import (
+    EditedScene,
+    EditedScenes,
+    GeneratedActScene,
+    GeneratedActStructure,
+    GeneratedPlace,
+    GeneratedScenePlan,
+)
 from anton.application.scene_planner import ScenePlanner
 from anton.domain.models import PlaceDraft
-from tests.unit.fakes import FakeSLMClient
+from tests.unit.fakes import FakeSLMClient, ScriptedSLMClient
 from tests.unit.test_scene_service import PLAN, STRUCTURE
 
 
@@ -40,7 +47,7 @@ class StructureTargetTest(TestCase):
 
         self.assertEqual(
             StructureTarget().generate_input(source),
-            "# OUTLINE\n\nO\n\n# ACT\n\nA\n\n# EARLIER ACTS\n\nE\n\n# PLACES\n\nP\n\n# CAST\n\nC",
+            "# OUTLINE\n\nO\n\n# ACT\n\nA\n\n# EARLIER ACTS\n\nE\n\n# PLACES\n\nP\n\n# CAST\n\nC\n\n# LANGUAGE\n\nEnglish",
         )
 
 
@@ -79,3 +86,43 @@ class ScenePlannerTest(IsolatedAsyncioTestCase):
         self.assertEqual((plan.place_notes, plan.what_happens), ("Shutters barred", "Late afternoon. Elias arrives soaked."))
         self.assertTrue(client.calls[0]["think"])
         self.assertIn('"act_summary": "Act."', client.calls[0]["user_prompt"])
+
+    async def test_asks_again_for_a_plan_of_a_few_words(self) -> None:
+        """Ask once more when the plan is only a phrase, and keep the full plan of the second answer."""
+        thin = GeneratedScenePlan(place_notes="The lights are out", what_happens="The lights are out")
+        full = GeneratedScenePlan(place_notes="Dark", what_happens="Night. " + "Elias argues with Margit about the will. " * 5)
+        client = ScriptedSLMClient(thin, full)
+
+        plan = await ScenePlanner(client).plan("Act.", [], make_board().scenes[0], {"name": "Kitchen"}, [], language="Russian")
+
+        self.assertTrue(plan.what_happens.startswith("Night."))
+        self.assertIn("four to six full sentences", client.calls[1]["user_prompt"])
+        self.assertIn('"language": "Russian"', client.calls[0]["user_prompt"])
+
+    async def test_asks_again_for_a_plan_that_repeats_an_earlier_scene(self) -> None:
+        """Ask once more, naming the scene, when the plan tells an earlier scene again."""
+        earlier = make_board().scenes[0].model_copy(update={"what_happens": "Night. " + "Elias argues with Margit about the will. " * 4})
+        again = GeneratedScenePlan(place_notes="Dark", what_happens=earlier.what_happens)
+        new = GeneratedScenePlan(place_notes="Dawn", what_happens="Morning. " + "Margit burns the logbook while Elias sleeps upstairs. " * 3)
+        client = ScriptedSLMClient(again, new)
+
+        plan = await ScenePlanner(client).plan("Act.", [earlier], make_board().scenes[1], {"name": "Kitchen"}, [])
+
+        self.assertTrue(plan.what_happens.startswith("Morning."))
+        self.assertIn(f"repeated scene {earlier.number}", client.calls[1]["user_prompt"])
+
+
+class StructureLimitTest(TestCase):
+    """Test the limits of the first structure of an act."""
+
+    def test_schema_asks_for_two_to_eight_scenes(self) -> None:
+        """Send the limits to the model and reject an act of one scene."""
+        schema = StructureTarget.generate_schema.model_json_schema()["properties"]["scenes"]
+        self.assertEqual((schema["minItems"], schema["maxItems"]), (2, 8))
+        with self.assertRaises(ValueError):
+            GeneratedActStructure(new_places=[], scenes=[GeneratedActScene(place="A", characters=[], what_happens="B")])
+
+    def test_schema_asks_for_two_characters_per_scene(self) -> None:
+        """Ask the model for at least two characters in every scene of a new structure."""
+        schema = StructureTarget.generate_schema.model_json_schema()["$defs"]["GeneratedActScene"]["properties"]["characters"]
+        self.assertEqual(schema["minItems"], 2)

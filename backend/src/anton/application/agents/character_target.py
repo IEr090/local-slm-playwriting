@@ -1,3 +1,6 @@
+from pydantic import ValidationError
+
+from anton.application.agents.change_lines import field_values, quoted_values
 from anton.application.llm_schemas.character_edit import EditedCharacter
 from anton.domain.models import Character
 
@@ -17,6 +20,21 @@ class CharacterTarget:
     def view(self, data: Character) -> dict:
         """Show the model the profile without the id, the relationships and the history."""
         return data.model_dump(exclude=NOT_EDITED_FIELDS)
+
+    def parse_changes(self, data: Character, changes: str) -> Character | None:
+        """Apply changes written as `field_key: new value` without the model; None if they are not written so."""
+        fields = set(Character.model_fields) - NOT_EDITED_FIELDS
+        values = field_values(changes, fields).get("", {}) or quoted_values(changes, fields)
+        if not values:
+            return None
+        patch: dict = {key: value.strip() for key, value in values.items()}
+        for key in ("gender", "dramatic_role"):
+            if key in patch:
+                patch[key] = patch[key].strip(".").lower() or None
+        try:
+            return Character(**(data.model_dump() | patch))
+        except ValidationError:
+            return None
 
     def apply(self, data: Character, edited: EditedCharacter) -> Character:
         """Take the profile from the model and keep the id, the relationships and the history."""

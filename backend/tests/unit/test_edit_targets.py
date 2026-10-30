@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from anton.application.agents.acts_target import ActsTarget
 from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.outline_target import OutlineTarget
-from anton.application.llm_schemas.act_generation import EditedAct, EditedActs, GeneratedActs
+from anton.application.llm_schemas.act_generation import EditedAct, EditedActs, GeneratedAct, GeneratedActs
 from anton.application.llm_schemas.outline_generation import GeneratedOutline
 from anton.domain.models import Relationship
 from tests.unit.test_chat_edit_agent import HISTORY, make_character, make_edited
@@ -42,7 +42,10 @@ class OutlineTargetTest(TestCase):
 
     def test_builds_input_from_idea_and_cast(self) -> None:
         """Put the idea and the cast under the headings of the generation prompt."""
-        self.assertEqual(OutlineTarget().generate_input({"idea": "An idea.", "cast": "[]"}), "# IDEA\n\nAn idea.\n\n# CAST\n\n[]")
+        self.assertEqual(
+            OutlineTarget().generate_input({"idea": "An idea.", "cast": "[]", "language": "Russian"}),
+            "# IDEA\n\nAn idea.\n\n# CAST\n\n[]\n\n# LANGUAGE\n\nRussian",
+        )
 
     def test_takes_whole_outline_with_trimmed_text(self) -> None:
         """Take every field from the model and trim stray spaces."""
@@ -58,7 +61,21 @@ class ActsTargetTest(TestCase):
 
     def test_builds_input_from_outline_and_cast(self) -> None:
         """Put the outline and the cast under the headings of the generation prompt."""
-        self.assertEqual(ActsTarget().generate_input({"outline": "{}", "cast": "[]"}), "# OUTLINE\n\n{}\n\n# CAST\n\n[]")
+        self.assertEqual(
+            ActsTarget().generate_input({"outline": "{}", "cast": "[]"}), "# OUTLINE\n\n{}\n\n# CAST\n\n[]\n\n# LANGUAGE\n\nEnglish",
+        )
+
+    def test_puts_acts_in_the_order_of_their_functions(self) -> None:
+        """Move a resolution written before the development to the end and number the acts in that order."""
+        generated = GeneratedActs([
+            GeneratedAct(summary="Start.", dramatic_function="setup"),
+            GeneratedAct(summary="End.", dramatic_function="resolution"),
+            GeneratedAct(summary="Middle.", dramatic_function="development"),
+        ])
+
+        acts = ActsTarget().from_generated(generated)
+
+        self.assertEqual([(a.number, a.summary) for a in acts], [(1, "Start."), (2, "Middle."), (3, "End.")])
 
     def test_numbers_generated_acts(self) -> None:
         """Number the acts from one in the model's order, with trimmed text."""

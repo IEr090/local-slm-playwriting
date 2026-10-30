@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from anton.application.agents.chat_edit_agent import ChatEditAgent
+from anton.application.language import play_language
 from anton.application.mappers.scene_mapper import full_name, to_scene_views
 from anton.application.mappers.text_mapper import ending, to_history_entries
 from anton.application.scene_service import act_thread, find_place, find_scene, on_stage_profiles, require_open_act
@@ -58,6 +59,7 @@ class TextService:
                 place=find_place(story, scene.place_id).model_dump(include={"name", "description"}),
                 characters=on_stage_profiles(cast, scene, number),
                 previous_ending=previous,
+                language=play_language(story.user_input),
             )
             scene_texts.append(SceneText(scene_number=scene.number, text=text))
             previous = ending(text, ENDING_BLOCKS)
@@ -68,6 +70,8 @@ class TextService:
         act.scene_texts = scene_texts
         act.text_built_from_scenes = [scene.to_plan() for scene in act.scenes]
         self.story_repository.save(story)
+        # The chat of the act page is about scenes and an earlier text; the new text starts it anew.
+        await self.text_agent.forget(act_thread(number))
         return story
 
     def edit_text(self, number: int, scene_texts: list[SceneText]) -> StoryBible:
@@ -100,7 +104,7 @@ class TextService:
         for scene_text in act.scene_texts:
             scene = find_scene(act, scene_text.scene_number)
             names = [full_name(character) for character in cast.characters if character.id in scene.character_ids]
-            generated = await self.writer.extract_history(scene_text.text, names)
+            generated = await self.writer.extract_history(scene_text.text, names, play_language(story.user_input))
             for character_id, items in to_history_entries(generated, number, scene.number, cast.characters).items():
                 entries.setdefault(character_id, []).extend(items)
 

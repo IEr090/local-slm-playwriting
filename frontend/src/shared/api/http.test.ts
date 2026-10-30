@@ -19,6 +19,7 @@ describe("postJson", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error.message).toBe("Could not reach the local model. Is Ollama running?");
     expect(error.detail).toBe("HTTP 503 · Ollama is not reachable");
+    expect(error.status).toBe(503);
   });
 
   it("reports an empty 502 from the dev proxy as a missing backend", async () => {

@@ -1,10 +1,10 @@
 import { Chip } from "@/shared/ui/Chip";
 import { GENDER_LABEL, roleLabel } from "@/features/characters/model/labels";
 import { DRAMATIC_ROLES, GENDERS, type Character, type CharacterCard } from "@/features/characters/model/types";
-import { FieldCard } from "./FieldCard";
+import { FieldCard, SectionHeading } from "@/shared/ui/FieldCard";
 import { RelationshipsField } from "./fields/RelationshipsField";
-import { SerifInput } from "./fields/SerifInput";
-import { TextField } from "./fields/TextField";
+import { SerifInput } from "@/shared/ui/fields/SerifInput";
+import { TextField } from "@/shared/ui/fields/TextField";
 
 type Patch = Partial<Omit<Character, "id">>;
 
@@ -142,16 +142,6 @@ export function FieldGrid({ character: c, cast, cards, onChange, highlighted = [
       </FieldCard>
 
       {text("character_arc", 16, "Character arc", 3, 4)}
-    </div>
-  );
-}
-
-function SectionHeading({ numeral, title, className = "" }: { numeral: string; title: string; className?: string }) {
-  return (
-    <div className={`col-span-4 mt-[6px] mb-[2px] flex items-center gap-[14px] ${className}`}>
-      <span className="font-serif text-xl text-gold italic">{numeral}</span>
-      <span className="font-sans text-[11px] tracking-[3px] text-ink-2">{title}</span>
-      <span className="dotted-rule flex-1" />
     </div>
   );
 }

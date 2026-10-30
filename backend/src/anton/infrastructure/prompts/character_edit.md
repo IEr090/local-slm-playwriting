@@ -19,6 +19,8 @@ Some fields of the profile may be empty.
 
 - Apply every requested change.
 - Change only what the requested changes affect. Copy all other fields exactly as they are.
+- When the changes name a part of a field, for example "the time at the start" or "the ending", rewrite only that part of the field and keep the rest of it.
+- The answer must differ from the input exactly where the changes say.
 - If a change makes another field contradict the profile, adjust that field so the profile stays consistent. For example, if the age changes, update the biography where it mentions the age.
 - Do not invent new facts that the changes do not imply.
 - Keep the language and style of the original profile.

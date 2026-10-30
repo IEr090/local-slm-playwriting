@@ -7,6 +7,8 @@ from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.scene_generation import (
     EditedScene,
     EditedScenes,
+    GeneratedActScene,
+    GeneratedActStructure,
     GeneratedPlace,
     GeneratedScenePlan,
     GeneratedStructure,
@@ -22,11 +24,11 @@ from tests.unit.test_story_service import make_acts
 
 
 KITCHEN = Place(id="kitchen", name="The keeper's kitchen", description="A stove and a table for three.", significance="Home.")
-STRUCTURE = GeneratedStructure(
+STRUCTURE = GeneratedActStructure(
     new_places=[GeneratedPlace(name=" The lamp room ", description="A great lens.", significance="The light.")],
     scenes=[
-        GeneratedStructureScene(place="The keeper's kitchen", characters=["Elias Hale"], what_happens=" Elias arrives. "),
-        GeneratedStructureScene(place="The lamp room", characters=["Margit", "Elias"], what_happens="Voss reads the will."),
+        GeneratedActScene(place="The keeper's kitchen", characters=["Elias Hale"], what_happens=" Elias arrives. "),
+        GeneratedActScene(place="The lamp room", characters=["Margit", "Elias"], what_happens="Voss reads the will."),
     ],
 )
 PLAN = GeneratedScenePlan(place_notes=" Shutters barred ", what_happens=" Late afternoon. Elias arrives soaked. ")
@@ -415,6 +417,22 @@ class SceneApprovalTest(IsolatedAsyncioTestCase):
 
         self.assertEqual(story.acts[0].scenes[0].to_plan(), plan)
         self.assertEqual((story.acts[0].scenes[0].status, story.acts[0].status), ("draft", "structure_approved"))
+
+    async def test_scenes_of_approved_text_are_final(self) -> None:
+        """Reject planning, editing, approving and reopening scenes once the act's text is approved."""
+        service, *_ = make_service(story=make_story(make_scene(1, status="approved"), status="text_approved"))
+
+        for change in (
+            lambda: service.reopen_scene(1, 1),
+            lambda: service.approve_scene(1, 1),
+            lambda: service.edit_scene(1, 1, make_scene(1).to_plan()),
+        ):
+            with self.assertRaises(StoryOrderError):
+                change()
+        with self.assertRaises(StoryOrderError):
+            await service.plan_scene(1, 1)
+        with self.assertRaises(StoryOrderError):
+            await service.revise_scenes(1, [make_scene(1).to_plan()], "Change it.")
 
     async def test_editing_earlier_scene_marks_later_plans_outdated(self) -> None:
         """Expose the later scenes whose plans were written from the earlier version."""

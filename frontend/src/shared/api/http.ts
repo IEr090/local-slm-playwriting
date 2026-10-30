@@ -50,14 +50,14 @@ async function toApiError(response: Response): Promise<ApiError> {
   const body = parseJson(text);
 
   if (isObject(body) && typeof body.message === "string") {
-    return new ApiError(body.message, typeof body.detail === "string" ? `${status} · ${body.detail}` : status);
+    return new ApiError(body.message, typeof body.detail === "string" ? `${status} · ${body.detail}` : status, response.status);
   }
   // the dev proxy answers an empty 502 when nothing listens on the backend port
   if (response.status >= 500 && !text) {
-    return new ApiError("The server did not answer. Is the backend running?", status);
+    return new ApiError("The server did not answer. Is the backend running?", status, response.status);
   }
   const detail = isObject(body) && "detail" in body ? JSON.stringify(body.detail) : text || response.statusText;
-  return new ApiError("The server could not handle the request.", `${status} · ${detail}`);
+  return new ApiError("The server could not handle the request.", `${status} · ${detail}`, response.status);
 }
 
 function parseJson(text: string): unknown {
