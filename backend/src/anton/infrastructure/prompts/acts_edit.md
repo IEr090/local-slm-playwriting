@@ -11,11 +11,13 @@ Your task is to return the acts the agreed changes are about, with the changes a
 The user provides a JSON object with two keys:
 
 - `acts`: All acts in order. Each has a `number`, a `summary` and a `dramatic_function`.
-- `changes`: The agreed changes, one field per line as `act N field_key: new value`.
+- `changes`: The agreed changes, one field per line as `act N field_key: new value`, or the dramaturg's proposal in prose that the playwright agreed to.
 
 # RULES
 
 - Return only the acts named in `changes`. Keep their `number` exactly as in `acts`.
+- When `changes` names a part of a field, for example "the time at the start" or "the ending", rewrite only that part of the field and keep the rest of it.
+- The answer must differ from the input exactly where `changes` says.
 - Take the new value of every field named in `changes` from `changes`.
 - Copy every other field of these acts unchanged, word for word.
 - `dramatic_function` is exactly one of `setup`, `development`, `climax`, `resolution`.

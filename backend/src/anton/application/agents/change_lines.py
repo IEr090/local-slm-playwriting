@@ -30,13 +30,25 @@ def _spoken(field: str) -> str:
     return field.replace("_", r"[ _]")
 
 
-def quoted_values(text: str, fields: set[str]) -> dict[str, str]:
-    """Read new values from a proposal in prose, e.g. `I suggest the tone: «Darker.»` → {"tone": "Darker."}."""
-    names = "|".join(_spoken(field) for field in sorted(fields, key=len, reverse=True))
+def quoted_values(text: str, fields: set[str], aliases: dict[str, str] | None = None) -> dict[str, str]:
+    """Read new values from a proposal in prose, e.g. `I suggest the tone: «Darker.»` → {"tone": "Darker.", ...}.
+
+    `aliases` maps other names of a field, e.g. in Russian, to the field: {"центральный конфликт": "central_conflict"}.
+    """
+    names = {_spoken(field): field for field in fields} | {re.escape(alias): field for alias, field in (aliases or {}).items()}
+    pattern = "|".join(sorted(names, key=len, reverse=True))
     values = {}
-    for match in re.finditer(rf"\b({names})\b\s*(?:to|:)?\s*«([^»]+)»", text, re.IGNORECASE):
-        values[match.group(1).lower().replace(" ", "_")] = match.group(2).strip()
+    for match in re.finditer(rf"(?<!\w)({pattern})\w*(?:\s+(?:to|be|should be|will be|is|на|:)|:)?\s*{QUOTED}", text, re.IGNORECASE):
+        name = match.group(1).casefold()
+        field = next((f for key, f in names.items() if re.fullmatch(key, name, re.IGNORECASE)), None)
+        value = next(group for group in match.groups()[1:] if group is not None)
+        if field and value.strip():
+            values[field] = value.strip()
     return values
+
+
+# A quoted value: «…», "…", “…” or '…' (an apostrophe inside a word, as in "Elias's", does not end it).
+QUOTED = r"""(?:«([^»]+)»|"([^"]+)"|“([^”]+)”|'(.+?)'(?=[\s.,;:!?)]|$))"""
 
 
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5}
@@ -45,10 +57,11 @@ NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "first": 1
 def quoted_acts(text: str) -> dict[int, str]:
     """Read new act summaries from a proposal in prose, e.g. `I suggest for Act Two: «...»` → {2: "..."}."""
     acts = {}
-    pattern = r"\bact\s+(\d+|one|two|three|four|five)\b[^«]{0,20}«([^»]+)»|\b(first|second|third|fourth|fifth)\s+act\b[^«]{0,20}«([^»]+)»"
+    pattern = rf"(?:\bact\s+(\d+|one|two|three|four|five)\b|\b(first|second|third|fourth|fifth)\s+act\b)[^«\"“']{{0,25}}{QUOTED}"
     for match in re.finditer(pattern, text, re.IGNORECASE):
-        word = (match.group(1) or match.group(3)).lower()
-        acts[int(word) if word.isdigit() else NUMBER_WORDS[word]] = (match.group(2) or match.group(4)).strip()
+        word = (match.group(1) or match.group(2)).lower()
+        value = next(group for group in match.groups()[2:] if group is not None)
+        acts[int(word) if word.isdigit() else NUMBER_WORDS[word]] = value.strip()
     return acts
 
 

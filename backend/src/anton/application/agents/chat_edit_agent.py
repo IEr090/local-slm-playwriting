@@ -16,6 +16,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel
 
+from anton.application.language import language_of
 from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
@@ -131,19 +132,6 @@ NOT_APPLIED = {
     "Russian": "Не получилось применить это изменение. Скажите ещё раз, что именно нужно изменить.",
     "German": "Ich konnte die Änderung nicht übernehmen. Bitte sagen Sie noch einmal genau, was sich ändern soll.",
 }
-
-
-def language_of(text: str) -> str | None:
-    """Name the language of a text from its letters: Russian, German or English; None for too few letters."""
-    letters = re.findall(r"[^\W\d_]", text)
-    if len(letters) < 4:
-        return None
-    cyrillic = sum("а" <= letter.lower() <= "я" or letter.lower() == "ё" for letter in letters)
-    if cyrillic * 2 > len(letters):
-        return "Russian"
-    if re.search(r"[äöüß]", text, re.IGNORECASE) or re.search(r"\b(und|nicht|ist|der|die|das|bitte)\b", text, re.IGNORECASE):
-        return "German"
-    return "English"
 
 
 def is_proposal(text: str) -> bool:

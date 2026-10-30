@@ -7,6 +7,7 @@ from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.scene_generation import (
     EditedScene,
     EditedScenes,
+    GeneratedActScene,
     GeneratedActStructure,
     GeneratedPlace,
     GeneratedScenePlan,
@@ -26,8 +27,8 @@ KITCHEN = Place(id="kitchen", name="The keeper's kitchen", description="A stove 
 STRUCTURE = GeneratedActStructure(
     new_places=[GeneratedPlace(name=" The lamp room ", description="A great lens.", significance="The light.")],
     scenes=[
-        GeneratedStructureScene(place="The keeper's kitchen", characters=["Elias Hale"], what_happens=" Elias arrives. "),
-        GeneratedStructureScene(place="The lamp room", characters=["Margit", "Elias"], what_happens="Voss reads the will."),
+        GeneratedActScene(place="The keeper's kitchen", characters=["Elias Hale"], what_happens=" Elias arrives. "),
+        GeneratedActScene(place="The lamp room", characters=["Margit", "Elias"], what_happens="Voss reads the will."),
     ],
 )
 PLAN = GeneratedScenePlan(place_notes=" Shutters barred ", what_happens=" Late afternoon. Elias arrives soaked. ")

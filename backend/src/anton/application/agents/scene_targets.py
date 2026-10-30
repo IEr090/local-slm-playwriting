@@ -51,7 +51,7 @@ class StructureTarget:
         """Give the model the outline, the act, the acts before it, the places and the cast."""
         return "\n\n".join(f"# {title}\n\n{source[key]}" for key, title in (
             ("outline", "OUTLINE"), ("act", "ACT"), ("earlier_acts", "EARLIER ACTS"), ("places", "PLACES"), ("cast", "CAST"),
-        ))
+        )) + f"\n\n# LANGUAGE\n\n{source.get('language', 'English')}"
 
     def from_generated(self, generated: GeneratedStructure) -> SceneBoard:
         """Number the generated scenes from one."""

@@ -109,6 +109,10 @@ The Story Bible says when something was changed after later steps were built fro
 
 Every page has its own agent built from one LangGraph graph (`application/agents/chat_edit_agent.py`): the agent proposes a change, applies it once the user agrees and returns the changed data, which the frontend puts into its fields and saves. The agent answers in the language of the user's messages and keeps the edited text in its own language. A short "yes" to a proposal applies it; when an edit changes nothing, the agent says so instead of claiming it was applied. The text agent changes single lines, so the rest of a scene always stays as it is. The chats are saved to `backend/data/chats/` and survive a restart of the backend.
 
+### Generation
+
+Every generation is written in the language of the user's idea, which the backend names in the input of each prompt. A small model often ignores parts of its prompt, so the backend checks the answers that matter most and asks once more when they fail: an act structure has two to eight scenes with at least two characters each; a scene plan must be several sentences, must not copy its instructions or examples and must not repeat an earlier scene; a scene text must be at least 20 lines in which only the characters on stage speak, no line repeats an earlier one and no character retells the plan. Acts are put in the order of their dramatic functions, and lines that still repeat are dropped from the text.
+
 ## Project structure
 
 - `backend/src/anton/`: Python package and application entry point.

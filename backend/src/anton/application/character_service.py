@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from anton.errors import CastNotFoundError, CharacterNotFoundError
+from anton.application.language import play_language
 from anton.application.llm_schemas.character_generation import GeneratedCard, GeneratedCast
 from anton.application.mappers.character_mapper import to_characters
 from anton.domain.models import Cast, Character, CharacterCard, CharacterDraft, CharacterWithCard
@@ -27,7 +28,7 @@ class CharacterService:
         """Generate the whole cast with a card for every character and replace the saved cast."""
         generated = await self.client.generate(
             system_prompt=load_prompt("character_generation.md"),
-            user_prompt=premise,
+            user_prompt=f"{premise}\n\n# LANGUAGE\n\nWrite every text field in {play_language(premise)}.",
             response_model=GeneratedCast,
             think=True,
         )

@@ -25,7 +25,7 @@ The provided information may be incomplete.
 
 # TASK
 
-1. Identify all characters explicitly mentioned by the user.
+1. Identify all characters explicitly mentioned by the user who are alive and can appear on stage during the play. A character who is dead when the play begins, or who dies in the opening event the user describes (for example "a keeper dies and his children wait for the will"), is not a role: mention them in the biographies and relationships of the others instead.
 2. Collect all available information about each character.
 3. Preserve every fact explicitly provided by the user.
 4. Infer only information that is missing and necessary for understanding the character.
@@ -62,7 +62,7 @@ For each character, fill in the following fields. Field keys are given in backti
     - `mentor`: guides or teaches another character;
     - `foil`: contrasts with another character and highlights their traits.
 - `dramatic_role_description`: How this character drives or blocks the central conflict.
-- `goal`: What the character wants to achieve.
+- `goal`: What the character wants to achieve during the play: a concrete aim they can actively pursue on stage against resistance, for example "Get the house sold before the winter" — not "to understand", "to wait" or "to be happy".
 - `motivation`: Why this goal matters to the character.
 - `fear_weakness`: The character's main fear, weakness, or vulnerability.
 - `internal_conflict`: The character's main internal contradiction.
@@ -105,6 +105,7 @@ For each character, fill in the following fields. Field keys are given in backti
 - Characters may be contradictory, but their behaviour should not feel random.
 - Do not make characters artificially likeable.
 - Do not introduce new characters unless they are necessary for the logic of the provided story.
+- Write every text field in the language named in the `LANGUAGE` section at the end of the input, the names of the characters included. Only field keys and fixed values such as `gender` and `dramatic_role` stay in English.
 
 # CHARACTER ARC RULE
 

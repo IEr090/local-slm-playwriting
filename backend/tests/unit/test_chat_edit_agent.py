@@ -465,3 +465,7 @@ class DirectChangesTest(AgentTestCase):
         acts = ActsTarget().parse_changes(summaries(), "Предлагаю для Act Two: «The storm wins.» Подтверждаете?")
         self.assertEqual(acts[1].summary, "The storm wins.")
         self.assertIsNone(ActsTarget().parse_changes(summaries(), "I suggest making it darker."))
+        quoted = OutlineTarget().parse_changes(make_outline(), "I suggest changing the genre to 'farce' and the tone to 'Light, with Elias's jokes'.")
+        self.assertEqual((quoted.genre, quoted.tone), ("farce", "Light, with Elias's jokes"))
+        russian = OutlineTarget().parse_changes(make_outline(), "Предлагаю усилить центральный конфликт: «Они враги.» Подтверждаете?")
+        self.assertEqual(russian.central_conflict, "Они враги.")

@@ -6,6 +6,24 @@ from anton.application.mappers.outline_mapper import to_outline
 from anton.domain.models import Outline
 
 
+# Other names of the outline fields in proposals, in English and Russian; "the ending" is only part of the synopsis.
+OUTLINE_ALIASES = {
+    "central conflict": "central_conflict",
+    "conflict": "central_conflict",
+    "time and world": "time_and_world",
+    "название": "title",
+    "премис": "premise",
+    "жанр": "genre",
+    "тон": "tone",
+    "атмосфер": "tone",
+    "время и мир": "time_and_world",
+    "центральн\\w* конфликт": "central_conflict",
+    "конфликт": "central_conflict",
+    "синопсис": "synopsis",
+    "сюжет": "synopsis",
+}
+
+
 class OutlineTarget:
     """Let an editing agent write the outline of the play from the user's idea and the cast, then revise it."""
 
@@ -27,7 +45,9 @@ class OutlineTarget:
     def parse_changes(self, data: Outline, changes: str) -> Outline | None:
         """Apply changes written as `field_key: new value` without the model; None if they are not written so."""
         # as the prompt asks (`tone: ...`), or as in a proposal the playwright agreed to (`the tone: «...»`)
-        values = field_values(changes, set(Outline.model_fields)).get("", {}) or quoted_values(changes, set(Outline.model_fields))
+        values = field_values(changes, set(Outline.model_fields)).get("", {}) or quoted_values(
+            changes, set(Outline.model_fields), OUTLINE_ALIASES,
+        )
         if not values:
             return None
         if "genre" in values:
@@ -39,7 +59,7 @@ class OutlineTarget:
 
     def generate_input(self, source: dict[str, str]) -> str:
         """Give the model the user's idea and the cast under the headings the prompt describes."""
-        return f"# IDEA\n\n{source['idea']}\n\n# CAST\n\n{source['cast']}"
+        return f"# IDEA\n\n{source['idea']}\n\n# CAST\n\n{source['cast']}\n\n# LANGUAGE\n\n{source.get('language', 'English')}"
 
     def from_generated(self, generated: GeneratedOutline) -> Outline:
         """Turn the generated outline into the outline of the Story Bible."""

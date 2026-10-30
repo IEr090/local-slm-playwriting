@@ -1,5 +1,6 @@
 import json
 
+from anton.application.language import play_language
 from anton.application.agents.chat_edit_agent import ChatEditAgent, ChatEditResult, ChatMessage
 from anton.domain.models import Act, ActSummary, Cast, DramaticFunction, Outline, StoryBible
 from anton.errors import ActNotFoundError, CastNotFoundError, StoryNotFoundError, StoryOrderError
@@ -51,7 +52,12 @@ class StoryService:
         _require_outline_open(story)
 
         outline = await self.outline_agent.generate(
-            OUTLINE_THREAD, {"idea": story.user_input, "cast": cast_json(self._get_cast(), OUTLINE_CAST_FIELDS)},
+            OUTLINE_THREAD,
+            {
+                "idea": story.user_input,
+                "cast": cast_json(self._get_cast(), OUTLINE_CAST_FIELDS),
+                "language": play_language(story.user_input),
+            },
         )
 
         # Another request may have saved the Story Bible while the outline was generated.
@@ -84,7 +90,11 @@ class StoryService:
 
         summaries = await self.acts_agent.generate(
             ACTS_THREAD,
-            {"outline": story.outline.model_dump_json(indent=2), "cast": cast_json(self._get_cast(), ACT_CAST_FIELDS)},
+            {
+                "outline": story.outline.model_dump_json(indent=2),
+                "cast": cast_json(self._get_cast(), ACT_CAST_FIELDS),
+                "language": play_language(story.user_input),
+            },
         )
 
         story = self._get_story_with_outline()

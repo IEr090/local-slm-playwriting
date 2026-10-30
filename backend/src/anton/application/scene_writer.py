@@ -2,7 +2,14 @@ import json
 
 from anton.application.agents.scene_targets import SceneView
 from anton.application.llm_schemas.text_generation import GeneratedHistory, GeneratedSceneText
-from anton.application.mappers.text_mapper import format_lines, unknown_speakers
+from anton.application.mappers.text_mapper import (
+    format_lines,
+    looping_phrases,
+    narrated_lines,
+    repeated_lines,
+    unknown_speakers,
+    without_repeats,
+)
 from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
 
@@ -22,6 +29,7 @@ class SceneWriter:
         place: dict,
         characters: list[dict],
         previous_ending: str,
+        language: str = "English",
     ) -> str:
         """Write the dialogue and stage directions of a scene from its approved plan, in play format."""
         user_prompt = json.dumps(
@@ -32,19 +40,20 @@ class SceneWriter:
                 "place": place,
                 "characters": characters,
                 "previous_scene_ending": previous_ending,
+                "language": language,
             },
             ensure_ascii=False,
         )
         generated = await self._write(user_prompt)
-        strangers = unknown_speakers(generated.lines, characters)
-        if strangers:
-            # A small model sometimes lets someone speak who is not on stage; it gets one more try with the names.
+        problems = _problems(generated, characters)
+        if problems:
+            # A small model sometimes lets strangers speak, repeats itself or retells the plan; one more try.
             names = ", ".join(f"{c.get('name', '')} {c.get('surname', '')}".strip() for c in characters)
-            correction = f"{user_prompt}\n\nOnly these characters may speak: {names}. Do not let {', '.join(strangers)} speak."
+            correction = f"{user_prompt}\n\nYour last answer had these problems: {' '.join(problems)} Only these characters may speak: {names}."
             retried = await self._write(correction)
-            if len(unknown_speakers(retried.lines, characters)) < len(strangers):
+            if len(_problems(retried, characters)) < len(problems):
                 generated = retried
-        return format_lines(generated.lines)
+        return format_lines(without_repeats(generated.lines))
 
     async def _write(self, user_prompt: str) -> GeneratedSceneText:
         """Ask the model for the lines of a scene."""
@@ -55,11 +64,25 @@ class SceneWriter:
             think=True,
         )
 
-    async def extract_history(self, scene_text: str, characters: list[str]) -> GeneratedHistory:
+    async def extract_history(self, scene_text: str, characters: list[str], language: str = "English") -> GeneratedHistory:
         """Find out what the scene changed for each character on stage."""
         return await self.client.generate(
             system_prompt=load_prompt("character_history.md"),
-            user_prompt=json.dumps({"scene_text": scene_text, "characters": characters}, ensure_ascii=False),
+            user_prompt=json.dumps({"scene_text": scene_text, "characters": characters, "language": language}, ensure_ascii=False),
             response_model=GeneratedHistory,
             think=False,
         )
+
+
+def _problems(generated: GeneratedSceneText, characters: list[dict]) -> list[str]:
+    """Describe what is wrong with a written scene, as a correction for the model; empty when nothing is."""
+    problems = []
+    if strangers := unknown_speakers(generated.lines, characters):
+        problems.append(f"Do not let {', '.join(strangers)} speak.")
+    if repeated_lines(generated.lines):
+        problems.append("Some lines repeat earlier lines; every line must be new.")
+    if loops := looping_phrases(generated.lines):
+        problems.append(f'The phrase "{loops[0]}" comes back again and again; let the scene move on instead.')
+    if narrated_lines(generated.lines, characters):
+        problems.append("Some speeches tell about the speaker by name like a plan; a speech is what the character says aloud.")
+    return problems

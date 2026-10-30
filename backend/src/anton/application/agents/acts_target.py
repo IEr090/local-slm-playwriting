@@ -42,7 +42,7 @@ class ActsTarget:
 
     def generate_input(self, source: dict[str, str]) -> str:
         """Give the model the outline and the cast under the headings the prompt describes."""
-        return f"# OUTLINE\n\n{source['outline']}\n\n# CAST\n\n{source['cast']}"
+        return f"# OUTLINE\n\n{source['outline']}\n\n# CAST\n\n{source['cast']}\n\n# LANGUAGE\n\n{source.get('language', 'English')}"
 
     def from_generated(self, generated: GeneratedActs) -> list[ActSummary]:
         """Number the generated acts from one."""

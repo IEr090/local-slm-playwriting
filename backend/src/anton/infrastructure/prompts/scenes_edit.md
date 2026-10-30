@@ -11,11 +11,13 @@ Your task is to return the scenes the agreed changes are about, with the changes
 The user provides a JSON object with two keys:
 
 - `scenes`: All scenes in order. Each has a `number`, a `place`, `place_notes`, the `characters` on stage and `what_happens`.
-- `changes`: The agreed changes, one field per line as `scene N field_key: new value`.
+- `changes`: The agreed changes, one field per line as `scene N field_key: new value`, or the dramaturg's proposal in prose that the playwright agreed to.
 
 # RULES
 
 - Return only the scenes named in `changes`. Keep their `number` exactly as in `scenes`.
+- When `changes` names a part of a field, for example "the time at the start" or "the ending", rewrite only that part of the field and keep the rest of it.
+- The answer must differ from the input exactly where `changes` says.
 - Take the new value of every field named in `changes` from `changes`.
 - Copy every other field of these scenes unchanged, word for word.
 - If a change names a place that is not used by any scene yet, add it to `new_places` with a short `description` and `significance`.

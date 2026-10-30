@@ -9,10 +9,18 @@ class GeneratedLine(BaseModel):
     text: str = Field(description="What the character says, or the stage direction itself.")
 
 
+# Without a lower limit a small model writes a scene of five lines or of stage directions only. The limit is
+# only part of the JSON schema sent to the model, so shorter texts from elsewhere (tests, edits) stay valid.
+MIN_SCENE_LINES = 20
+
+
 class GeneratedSceneText(BaseModel):
     """Represent the dialogue and stage directions of one scene as the language model writes them."""
 
-    lines: list[GeneratedLine] = Field(description="The scene from beginning to end. Start with a stage direction that sets the scene.")
+    lines: list[GeneratedLine] = Field(
+        description="The scene from beginning to end, mostly speeches. Start with a stage direction that sets the scene.",
+        json_schema_extra={"minItems": MIN_SCENE_LINES},
+    )
 
 
 class LineEdit(BaseModel):

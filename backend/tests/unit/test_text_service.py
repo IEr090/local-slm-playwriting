@@ -13,7 +13,17 @@ from anton.application.llm_schemas.text_generation import (
     LineEdit,
 )
 from anton.application.agents.scene_targets import SceneView
-from anton.application.mappers.text_mapper import apply_line_edits, ending, format_lines, to_history_entries, unknown_speakers
+from anton.application.mappers.text_mapper import (
+    apply_line_edits,
+    ending,
+    format_lines,
+    looping_phrases,
+    narrated_lines,
+    repeated_lines,
+    to_history_entries,
+    unknown_speakers,
+    without_repeats,
+)
 from anton.application.scene_writer import SceneWriter
 from anton.application.text_service import TextService
 from anton.domain.models import Cast, CharacterHistoryEntry, SceneText
@@ -261,7 +271,7 @@ class ApproveTextTest(IsolatedAsyncioTestCase):
         elias = cast_repository.load().characters[1]
         self.assertEqual([(entry.act_number, entry.scene_number) for entry in elias.history], [(1, 1), (1, 2)])
         self.assertEqual(cast_repository.load().characters[0].history, [])
-        self.assertEqual(json.loads(client.calls[0]["user_prompt"]), {"scene_text": "ELIAS: One.", "characters": ["Elias Hale"]})
+        self.assertEqual(json.loads(client.calls[0]["user_prompt"]), {"scene_text": "ELIAS: One.", "characters": ["Elias Hale"], "language": "English"})
 
     async def test_replaces_old_entries_of_the_act(self) -> None:
         """Remove the entries of an act written before and keep the entries of other acts."""
@@ -345,3 +355,39 @@ class DirectTextChangesTest(TestCase):
     def test_leaves_other_wording_to_the_model(self) -> None:
         """Return None for changes that are not written as replacements."""
         self.assertIsNone(TextTarget().parse_changes([SceneText(scene_number=1, text=SCENE)], "make it sharper"))
+
+
+class TextDefectTest(IsolatedAsyncioTestCase):
+    """Test finding repeated and narrated lines in a written scene."""
+
+    def test_finds_repeated_and_narrated_lines(self) -> None:
+        """Count word-for-word repeats and speeches that tell about the speaker by name."""
+        lines = [
+            GeneratedLine(character="ELIAS", parenthetical="", text="We stay."),
+            GeneratedLine(character="MARGIT", parenthetical="", text="Elias, we go."),
+            GeneratedLine(character="ELIAS", parenthetical="", text="Elias quickly checks the papers to be sure."),
+            GeneratedLine(character="ELIAS", parenthetical="", text="We  stay."),
+        ]
+
+        self.assertEqual(repeated_lines(lines), 1)
+        near = [GeneratedLine(character="E", parenthetical="", text=text) for text in ("I have to. The storm is coming.", "No. I have to. The storm is coming.", "Then we stay and wait for the boat.")]
+        self.assertEqual(repeated_lines(near), 1)
+        threat = "if the repairs are not done by tomorrow I lock the room"
+        loop = [GeneratedLine(character="I", parenthetical="", text=f"{start}, {threat}.") for start in ("Listen", "I am not threatening", "It is my family")]
+        self.assertIn("i lock the room", " ".join(looping_phrases(loop)))
+        self.assertEqual(looping_phrases(loop[:2]), [])
+        # the second speech is the first one again with another opening, the third brings the phrase back once more
+        self.assertEqual([line.text for line in without_repeats(loop)], [loop[0].text])
+        self.assertEqual(narrated_lines(lines, ON_STAGE), 1)
+        self.assertEqual([line.text for line in without_repeats(lines)], ["We stay.", "Elias, we go.", "Elias quickly checks the papers to be sure."])
+
+    async def test_writes_again_when_lines_repeat(self) -> None:
+        """Ask once more when the scene repeats itself, and drop exact repeats from the text."""
+        line = GeneratedLine(character="Elias", parenthetical="", text="We stay.")
+        looping = GeneratedSceneText(lines=[line, line, line])
+        client = ScriptedSLMClient(looping, looping)
+
+        text = await SceneWriter(client).write({}, "", make_view(), {}, ON_STAGE, "")
+
+        self.assertEqual(text, "ELIAS: We stay.")
+        self.assertIn("every line must be new", client.calls[1]["user_prompt"])

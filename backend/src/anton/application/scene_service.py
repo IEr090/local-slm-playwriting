@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from anton.application.agents.chat_edit_agent import ChatEditAgent, ChatMessage
 from anton.application.agents.scene_targets import SceneBoard
+from anton.application.language import play_language
 from anton.application.mappers.scene_mapper import add_new_places, full_name, to_scene_plans, to_scene_views, to_scenes
 from anton.application.scene_planner import ScenePlanner
 from anton.application.story_service import ACT_CAST_FIELDS, cast_json, find_act
@@ -73,6 +74,7 @@ class SceneService:
             "earlier_acts": _json([item.model_dump(include={"number", "summary"}) for item in story.acts if item.number < number]),
             "places": _json([place.model_dump(include={"name", "description"}) for place in story.places]),
             "cast": cast_json(cast, ACT_CAST_FIELDS),
+            "language": play_language(story.user_input),
         })
 
         # Another request may have saved the Story Bible while the structure was generated.
@@ -125,6 +127,8 @@ class SceneService:
             scene=views[scene_number - 1],
             place=place.model_dump(include={"name", "description"}),
             characters=on_stage_profiles(cast, scene, number),
+            language=play_language(story.user_input),
+            scenes_in_act=len(act.scenes),
         )
 
         story = self._get_story()
