@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
+from anton.application.agents.act_chat import ActChat, act_thread
 from anton.application.agents.chat_edit_agent import ChatEditAgent, ChatMessage
 from anton.application.agents.scene_targets import SceneBoard
 from anton.application.language import play_language
@@ -36,18 +37,13 @@ class SceneService:
         self,
         story_repository: StoryRepository,
         cast_repository: CastRepository,
-        structure_agent: ChatEditAgent[SceneBoard],
-        scenes_agent: ChatEditAgent[SceneBoard],
+        act_chat: ActChat,
         planner: ScenePlanner,
     ) -> None:
-        """Initialize the service with its repositories, the two agents of the act page and the scene planner.
-
-        Both agents share one store of conversations, so the act page has one chat whatever the stage.
-        """
+        """Initialize the service with its repositories, the chat of the act page and the scene planner."""
         self.story_repository = story_repository
         self.cast_repository = cast_repository
-        self.structure_agent = structure_agent
-        self.scenes_agent = scenes_agent
+        self.chat = act_chat
         self.planner = planner
 
     def get_places(self) -> list[Place]:
@@ -68,7 +64,7 @@ class SceneService:
         act = _require_structure_draft(story, number)
         cast = self._get_cast()
 
-        board = await self.structure_agent.generate(act_thread(number), {
+        board = await self.chat.structure.generate(act_thread(number), {
             "outline": story.outline.model_dump_json(include=OUTLINE_FIELDS, indent=2),
             "act": act.model_dump_json(include={"number", "dramatic_function", "summary"}, indent=2),
             "earlier_acts": _json([item.model_dump(include={"number", "summary"}) for item in story.acts if item.number < number]),
@@ -99,7 +95,7 @@ class SceneService:
         """Send the user's message with the scenes from their form to the act agent; only new places are saved."""
         story = self._get_story()
         act = _require_structure_draft(story, number)
-        return await self._revise(self.structure_agent, story, act, plans, message)
+        return await self._revise(self.chat.structure, story, act, plans, message)
 
     def approve_structure(self, number: int) -> StoryBible:
         """Approve the list of scenes, so their plans can be written one by one."""
@@ -156,7 +152,7 @@ class SceneService:
         """Send the user's message with the scene plans from their form to the act agent; only new places are saved."""
         story = self._get_story()
         act = _require_scenes_open(story, number)
-        return await self._revise(self.scenes_agent, story, act, plans, message)
+        return await self._revise(self.chat.scenes, story, act, plans, message)
 
     def approve_scene(self, number: int, scene_number: int) -> StoryBible:
         """Approve the plan of a scene; when the last scene is approved, the act's scenes are approved."""
@@ -180,14 +176,14 @@ class SceneService:
         return story
 
     async def act_chat(self, number: int) -> list[ChatMessage]:
-        """Return the chat history of the act page; both agents write into the same conversation."""
-        return await self.structure_agent.history(act_thread(number))
+        """Return the chat history of the act page."""
+        return await self.chat.history(number)
 
     async def forget_act_chats(self) -> None:
         """Forget the chats of every act page, e.g. when a new play is started."""
         story = self.story_repository.load()
         for act in story.acts if story is not None else []:
-            await self.structure_agent.forget(act_thread(act.number))
+            await self.chat.forget(act.number)
 
     async def _revise(
         self, agent: ChatEditAgent[SceneBoard], story: StoryBible, act: Act, plans: list[ScenePlan], message: str,
@@ -321,11 +317,6 @@ def on_stage_profiles(cast: Cast, scene: Scene, act_number: int) -> list[dict]:
         for character in cast.characters
         if character.id in scene.character_ids
     ]
-
-
-def act_thread(number: int) -> str:
-    """Return the id of the conversation of an act page."""
-    return f"act-{number}"
 
 
 def _json(value: object) -> str:

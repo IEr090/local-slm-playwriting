@@ -3,21 +3,19 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
-from langgraph.checkpoint.memory import InMemorySaver
 
+from anton.application.agents.act_chat import ActChat
 from anton.application.agents.acts_target import ActsTarget
 from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.agents.outline_target import OutlineTarget
-from anton.application.agents.scene_targets import SceneBoard, ScenesTarget, StructureTarget
-from anton.application.agents.text_target import TextTarget
 from anton.application.character_service import CharacterService
 from anton.application.scene_planner import ScenePlanner
 from anton.application.scene_service import SceneService
 from anton.application.scene_writer import SceneWriter
 from anton.application.text_service import TextService
 from anton.application.story_service import StoryService
-from anton.domain.models import ActSummary, Character, Outline, SceneText
+from anton.domain.models import ActSummary, Character, Outline
 from anton.infrastructure.config import Settings
 from anton.infrastructure.slm import SLMClient, create_slm_client
 from anton.infrastructure.storage import CastRepository, JsonCastRepository, JsonStoryRepository, StoryRepository
@@ -98,51 +96,32 @@ StoryServiceDep = Annotated[StoryService, Depends(get_story_service)]
 
 
 @lru_cache
-def get_act_checkpointer() -> InMemorySaver:
-    """Create one saved store of the act page conversations, shared by every agent of the page."""
-    return create_checkpointer(chat_file("acts-pages"))
-
-
-@lru_cache
-def get_structure_agent() -> ChatEditAgent[SceneBoard]:
-    """Create one agent that proposes and edits the scenes of an act."""
-    return ChatEditAgent(get_slm_client(), StructureTarget(), get_act_checkpointer())
-
-
-@lru_cache
-def get_scenes_agent() -> ChatEditAgent[SceneBoard]:
-    """Create one agent that edits the plans of the scenes of an act."""
-    return ChatEditAgent(get_slm_client(), ScenesTarget(), get_act_checkpointer())
+def get_act_chat() -> ActChat:
+    """Create the chat of the act pages with a saved store of its conversations, one per act."""
+    return ActChat(get_slm_client(), create_checkpointer(chat_file("acts-pages")))
 
 
 def get_scene_service(
     story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
     cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
-    structure_agent: Annotated[ChatEditAgent[SceneBoard], Depends(get_structure_agent)],
-    scenes_agent: Annotated[ChatEditAgent[SceneBoard], Depends(get_scenes_agent)],
+    act_chat: Annotated[ActChat, Depends(get_act_chat)],
     client: Annotated[SLMClient, Depends(get_slm_client)],
 ) -> SceneService:
-    """Create the scene service with the configured repositories, act page agents and scene planner."""
-    return SceneService(story_repository, cast_repository, structure_agent, scenes_agent, ScenePlanner(client))
+    """Create the scene service with the configured repositories, the act page chat and the scene planner."""
+    return SceneService(story_repository, cast_repository, act_chat, ScenePlanner(client))
 
 
 SceneServiceDep = Annotated[SceneService, Depends(get_scene_service)]
 
 
-@lru_cache
-def get_text_agent() -> ChatEditAgent[list[SceneText]]:
-    """Create one agent that revises the text of an act; it writes into the chat of the act page."""
-    return ChatEditAgent(get_slm_client(), TextTarget(), get_act_checkpointer())
-
-
 def get_text_service(
     story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
     cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
-    text_agent: Annotated[ChatEditAgent[list[SceneText]], Depends(get_text_agent)],
+    act_chat: Annotated[ActChat, Depends(get_act_chat)],
     client: Annotated[SLMClient, Depends(get_slm_client)],
 ) -> TextService:
-    """Create the text service with the configured repositories, the text agent and the scene writer."""
-    return TextService(story_repository, cast_repository, text_agent, SceneWriter(client))
+    """Create the text service with the configured repositories, the act page chat and the scene writer."""
+    return TextService(story_repository, cast_repository, act_chat, SceneWriter(client))
 
 
 TextServiceDep = Annotated[TextService, Depends(get_text_service)]

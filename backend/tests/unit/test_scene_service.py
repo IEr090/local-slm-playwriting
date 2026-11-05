@@ -1,8 +1,8 @@
 import json
 from unittest import IsolatedAsyncioTestCase
 
-from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
-from anton.application.agents.scene_targets import ScenesTarget, StructureTarget
+from anton.application.agents.act_chat import ActChat
+from anton.application.agents.chat_edit_agent import create_checkpointer
 from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.scene_generation import (
     EditedScene,
@@ -69,14 +69,7 @@ def make_service(*responses, story: StoryBible | None = None, cast: Cast | None 
     client = FakeSLMClient(*responses)
     repository = InMemoryStoryRepository(story if story is not None else make_story())
     cast_repository = InMemoryCastRepository(cast or Cast(characters=make_characters(), cards={}))
-    checkpointer = create_checkpointer()
-    service = SceneService(
-        repository,
-        cast_repository,
-        ChatEditAgent(client, StructureTarget(), checkpointer),
-        ChatEditAgent(client, ScenesTarget(), checkpointer),
-        ScenePlanner(client),
-    )
+    service = SceneService(repository, cast_repository, ActChat(client, create_checkpointer()), ScenePlanner(client))
     return service, client, repository
 
 

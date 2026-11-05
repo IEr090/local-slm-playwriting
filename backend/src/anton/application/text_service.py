@@ -1,10 +1,10 @@
 from pydantic import BaseModel
 
-from anton.application.agents.chat_edit_agent import ChatEditAgent
+from anton.application.agents.act_chat import ActChat, act_thread
 from anton.application.language import play_language
 from anton.application.mappers.scene_mapper import full_name, to_scene_views
 from anton.application.mappers.text_mapper import ending, to_history_entries
-from anton.application.scene_service import act_thread, find_place, find_scene, on_stage_profiles, require_open_act
+from anton.application.scene_service import find_place, find_scene, on_stage_profiles, require_open_act
 from anton.application.scene_writer import SceneWriter
 from anton.domain.models import Act, Cast, CharacterHistoryEntry, SceneText, StoryBible
 from anton.errors import CastNotFoundError, SceneNotFoundError, StoryNotFoundError, StoryOrderError
@@ -30,16 +30,13 @@ class TextService:
         self,
         story_repository: StoryRepository,
         cast_repository: CastRepository,
-        text_agent: ChatEditAgent[list[SceneText]],
+        act_chat: ActChat,
         writer: SceneWriter,
     ) -> None:
-        """Initialize the service with its repositories, the text agent of the act page and the scene writer.
-
-        The text agent shares its store of conversations with the other agents of the act page.
-        """
+        """Initialize the service with its repositories, the chat of the act page and the scene writer."""
         self.story_repository = story_repository
         self.cast_repository = cast_repository
-        self.text_agent = text_agent
+        self.chat = act_chat
         self.writer = writer
 
     async def generate_text(self, number: int) -> StoryBible:
@@ -71,7 +68,7 @@ class TextService:
         act.text_built_from_scenes = [scene.to_plan() for scene in act.scenes]
         self.story_repository.save(story)
         # The chat of the act page is about scenes and an earlier text; the new text starts it anew.
-        await self.text_agent.forget(act_thread(number))
+        await self.chat.forget(number)
         return story
 
     def edit_text(self, number: int, scene_texts: list[SceneText]) -> StoryBible:
@@ -88,7 +85,7 @@ class TextService:
         story = self._get_story()
         act = _require_text_draft(story, number)
         _check_scene_numbers(act, scene_texts)
-        result = await self.text_agent.send(act_thread(number), scene_texts, message, context={"act_summary": act.summary})
+        result = await self.chat.text.send(act_thread(number), scene_texts, message, context={"act_summary": act.summary})
         return TextRevision(reply=result.reply, scene_texts=result.data)
 
     async def approve_text(self, number: int) -> StoryBible:

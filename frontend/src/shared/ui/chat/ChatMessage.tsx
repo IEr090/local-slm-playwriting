@@ -3,8 +3,6 @@ export type ChatBubble =
   | {
       role: "user";
       text: string;
-      /** Small gold label above the text, e.g. "ACT TWO" or "SCENE 3". */
-      about?: string;
     }
   | {
       role: "ai";
@@ -20,7 +18,6 @@ export function ChatMessage({ message }: { message: ChatBubble }) {
   if (message.role === "user") {
     return (
       <div className={`${fadeUp} max-w-[82%] self-end rounded-[12px_12px_2px_12px] border border-gold/[0.333] bg-gold/10 px-4 py-3`}>
-        {message.about && <span className="mb-1 block font-sans text-[10px] tracking-[1.5px] text-gold">{message.about}</span>}
         <div className="font-sans text-[13px] leading-[1.5] text-ink">{message.text}</div>
       </div>
     );

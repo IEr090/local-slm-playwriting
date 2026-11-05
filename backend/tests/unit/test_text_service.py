@@ -1,7 +1,8 @@
 import json
 from unittest import IsolatedAsyncioTestCase, TestCase
 
-from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
+from anton.application.agents.act_chat import ActChat
+from anton.application.agents.chat_edit_agent import create_checkpointer
 from anton.application.agents.text_target import TextTarget
 from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.text_generation import (
@@ -59,7 +60,7 @@ def make_service(*responses, story=None, cast: Cast | None = None):
     repository = InMemoryStoryRepository(story if story is not None else make_text_story())
     cast_repository = InMemoryCastRepository(cast or Cast(characters=make_characters(), cards={}))
     service = TextService(
-        repository, cast_repository, ChatEditAgent(client, TextTarget(), create_checkpointer()), SceneWriter(client),
+        repository, cast_repository, ActChat(client, create_checkpointer()), SceneWriter(client),
     )
     return service, client, repository, cast_repository
 
@@ -163,11 +164,18 @@ class GenerateTextTest(IsolatedAsyncioTestCase):
     async def test_new_text_starts_the_act_chat_anew(self) -> None:
         """Forget the chat of the act page, which was about the scenes and an earlier text."""
         service, *_ = make_service(SCENE_TEXT, ChatTurn(reply="Which scene?", apply_changes=None), story=make_text_story(texts=False))
-        await service.text_agent.send("act-1", [], "Make it sharper.")
+        await service.chat.text.send("act-1", [], "Make it sharper.")
 
         await service.generate_text(1)
 
-        self.assertEqual(await service.text_agent.history("act-1"), [])
+        self.assertEqual(await service.chat.history(1), [])
+
+    async def test_text_agent_writes_into_the_act_page_chat(self) -> None:
+        """The text agent answers in the same conversation as the scene agents of the act page."""
+        service, *_ = make_service(ChatTurn(reply="Which scene?", apply_changes=None))
+        await service.chat.text.send("act-1", [], "Make it sharper.")
+
+        self.assertEqual([message.content for message in await service.chat.history(1)], ["Make it sharper.", "Which scene?"])
 
     async def test_writes_every_scene_and_remembers_scenes(self) -> None:
         """Store one text per scene in play format and the scenes it was written from."""

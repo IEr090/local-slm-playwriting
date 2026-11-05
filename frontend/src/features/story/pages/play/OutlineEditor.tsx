@@ -8,8 +8,6 @@ import { TextField } from "@/shared/ui/fields/TextField";
 interface OutlineEditorProps {
   outline: Outline;
   onChange(patch: Partial<Outline>): void;
-  /** Fields the agent is probably rewriting right now. */
-  updating: readonly OutlineField[];
   /** Fields the agent has just changed. */
   highlighted: readonly OutlineField[];
   readOnly?: boolean;
@@ -18,12 +16,11 @@ interface OutlineEditorProps {
 type TextKey = Exclude<OutlineField, "genre" | "title" | "premise">;
 
 /** The seven always-editable outline fields in two sections. */
-export function OutlineEditor({ outline: o, onChange, updating, highlighted, readOnly = false }: OutlineEditorProps) {
+export function OutlineEditor({ outline: o, onChange, highlighted, readOnly = false }: OutlineEditorProps) {
   const card = (key: OutlineField, num: number, span: 2 | 4, hint?: string) => ({
     num,
     label: OUTLINE_FIELD_LABEL[key],
     hint,
-    updating: updating.includes(key),
     highlighted: highlighted.includes(key),
     className: span === 4 ? "col-span-4" : "col-span-2",
   });

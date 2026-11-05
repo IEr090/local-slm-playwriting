@@ -4,7 +4,6 @@ import type { SceneText } from "@/features/story/model/types";
 import { cn } from "@/shared/lib/utils";
 import { TextField } from "@/shared/ui/fields/TextField";
 import { GenerationVeil } from "@/shared/ui/GenerationVeil";
-import { UpdatingOverlay } from "@/shared/ui/UpdatingOverlay";
 import { sceneAnchor } from "./anchors";
 
 interface ManuscriptProps {
@@ -19,14 +18,12 @@ interface ManuscriptProps {
   editable: boolean;
   /** The whole new text of a scene after a hand edit. */
   onEdit(scene: number, text: string): void;
-  /** Scenes the agent is rewriting right now. */
-  rewriting: number[];
   /** "S:I" of the lines the agent has just changed. */
   highlighted: string[];
 }
 
 /** The text of the act as a manuscript page: act and title, then every scene with its directions and speeches. */
-export function Manuscript({ act, playTitle, sceneTexts, placeOf, veil, approved, editable, onEdit, rewriting, highlighted }: ManuscriptProps) {
+export function Manuscript({ act, playTitle, sceneTexts, placeOf, veil, approved, editable, onEdit, highlighted }: ManuscriptProps) {
   const empty = sceneTexts.length === 0;
   return (
     <div
@@ -78,7 +75,6 @@ export function Manuscript({ act, playTitle, sceneTexts, placeOf, veil, approved
                 onCut={() => onEdit(scene, removeBlock(text, i))}
               />
             ))}
-            <UpdatingOverlay show={rewriting.includes(scene)} label="REWRITING" className="-inset-2 rounded-md" />
           </section>
         );
       })}

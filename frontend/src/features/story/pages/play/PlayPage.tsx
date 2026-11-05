@@ -80,7 +80,6 @@ export function PlayPage() {
   }
 
   const header = playHeader(state, story, showActs, actions);
-  const outlinePending = fieldsOf(state.pending, "outline:");
   const outlineHighlight = fieldsOf(state.highlight, "outline:");
 
   return (
@@ -116,7 +115,6 @@ export function PlayPage() {
                     outline={story.outline}
                     readOnly={showActs}
                     onChange={actions.editOutline}
-                    updating={typing === "outline" ? outlinePending : []}
                     highlighted={outlineHighlight}
                   />
                 </motion.div>
@@ -248,7 +246,7 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
 
 /** What one act card shows, from the Story Bible and the running requests. */
 function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: Actions, showNotice: (message: string) => void): ActCardProps {
-  const { jobs, failed, pending, highlight, typing } = state;
+  const { jobs, failed, highlight } = state;
   const n = act.number;
   const name = actName(n);
   const word = numberWord(n).toUpperCase();
@@ -273,7 +271,6 @@ function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: A
     // the summaries are final once the acts are approved
     onSummaryChange: veil || story.acts_approved ? undefined : (summary) => actions.editActSummary(n, summary),
     veil,
-    revising: typing === "acts" && pending.includes(`act:${n}`),
     highlighted: highlight.includes(`act:${n}`),
     dimmed: story.acts_approved && !!current && n > current.number,
     open: openable ? { label: read ? "READ" : "OPEN", aria: `${read ? "Read" : "Open"} ${name}`, onOpen: () => actions.openAct(n) } : null,

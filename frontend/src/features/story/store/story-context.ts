@@ -2,8 +2,10 @@
 
 import { createContext, useContext } from "react";
 import type { Outline, Place, PlaceDraft, ScenePlan } from "@/features/story/model/types";
-import type { ChatKind } from "@/features/story/model/targets";
 import type { ChatKey, StoryState } from "./story-reducer";
+
+/** Which chat a message goes to. */
+export type ChatKind = "outline" | "acts" | "structure" | "scenes" | "text";
 
 /** Which agent a chat message goes to; the act agents need the act's number. */
 export interface ChatContext {

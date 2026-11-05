@@ -6,7 +6,6 @@ import { SerifInput } from "@/shared/ui/fields/SerifInput";
 import { TextField } from "@/shared/ui/fields/TextField";
 import { HeaderPill } from "@/shared/ui/HeaderPill";
 import { Notice } from "@/shared/ui/Notice";
-import { UpdatingOverlay } from "@/shared/ui/UpdatingOverlay";
 
 export interface CastChip {
   id: string;
@@ -26,7 +25,6 @@ interface ScenePlanCardProps {
   final?: boolean;
   /** Move / cut buttons of a structure scene. */
   tools?: ReactNode;
-  updating?: boolean;
   highlighted?: boolean;
   notice?: string;
   readOnly?: boolean;
@@ -42,7 +40,6 @@ export function ScenePlanCard({
   onCreatePlace,
   status,
   tools,
-  updating = false,
   highlighted = false,
   notice,
   readOnly: readOnlyProp = false,
@@ -221,7 +218,6 @@ export function ScenePlanCard({
         {notice && <Notice className="mt-4">{notice}</Notice>}
       </div>
       {tools && <div className="flex items-start gap-[6px]">{tools}</div>}
-      <UpdatingOverlay show={updating} className="rounded-[10px]" />
     </article>
   );
 }

@@ -25,11 +25,7 @@ export interface StoryState {
   chats: Partial<Record<ChatKey, ChatBubble[]>>;
   /** The chat whose agent is answering (typing indicator), or null. */
   typing: ChatKey | null;
-  /**
-   * What the agent is probably changing right now ("UPDATING" overlay) and what it has just changed (gold glow):
-   * "outline:<field>", "act:N", "scene:N:S", "add:N" (a new scene of act N), "block:N:S:I" (a line of the text).
-   */
-  pending: string[];
+  /** What the agent has just changed (gold glow): "outline:<field>", "act:N", "scene:N:S", "block:N:S:I" (a line of the text). */
   highlight: string[];
   chatOpen: boolean;
   draft: string;
@@ -44,7 +40,6 @@ export const initialState: StoryState = {
   failed: [],
   chats: {},
   typing: null,
-  pending: [],
   highlight: [],
   chatOpen: true,
   draft: "",
@@ -67,7 +62,7 @@ export type Action =
   | { type: "setDraft"; draft: string }
   | { type: "chatLoaded"; key: ChatKey; messages: ChatBubble[] }
   | { type: "chatCleared"; key: ChatKey }
-  | { type: "messageSent"; key: ChatKey; text: string; about?: string; pending: string[] }
+  | { type: "messageSent"; key: ChatKey; text: string }
   | { type: "replyReceived"; key: ChatKey; text: string; updated: string[]; highlight: string[] }
   | { type: "replyFailed"; key: ChatKey }
   | { type: "clearHighlight" }
@@ -134,14 +129,12 @@ export function reducer(state: StoryState, action: Action): StoryState {
         ...state,
         draft: "",
         typing: action.key,
-        pending: action.pending,
-        chats: { ...state.chats, [action.key]: [...(state.chats[action.key] ?? []), { role: "user", text: action.text, about: action.about }] },
+        chats: { ...state.chats, [action.key]: [...(state.chats[action.key] ?? []), { role: "user", text: action.text }] },
       };
     case "replyReceived":
       return {
         ...state,
         typing: state.typing === action.key ? null : state.typing,
-        pending: [],
         highlight: action.highlight.length ? action.highlight : state.highlight,
         chats: {
           ...state.chats,
@@ -149,7 +142,7 @@ export function reducer(state: StoryState, action: Action): StoryState {
         },
       };
     case "replyFailed":
-      return { ...state, typing: state.typing === action.key ? null : state.typing, pending: [] };
+      return { ...state, typing: state.typing === action.key ? null : state.typing };
     case "clearHighlight":
       return { ...state, highlight: [] };
     case "setEditingScenes":

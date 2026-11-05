@@ -6,25 +6,21 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, t
 import { useLocation, useNavigate } from "react-router";
 import { useCastState } from "@/features/characters/store/cast-context";
 import { api } from "@/features/story/api";
-import { changedActNumbers, changedBlocks, changedOutlineFields, changedSceneIndexes, changedSceneTextNumbers } from "@/features/story/model/diff";
-import { actName, OUTLINE_FIELD_LABEL } from "@/features/story/model/labels";
-import { withLocalEdits, type EditKey } from "@/features/story/model/local-edits";
 import { currentAct, nextSceneToPlan } from "@/features/story/model/progress";
-import { addBlankScene, cutScene, moveScene, toPlan, toScenes } from "@/features/story/model/scenes";
-import { aboutLabel, predictTargets } from "@/features/story/model/targets";
+import { addBlankScene, cutScene, moveScene } from "@/features/story/model/scenes";
 import type { HistoryMessage, Outline, PlaceDraft, Scene, ScenePlan, StoryBible } from "@/features/story/model/types";
 import { paths } from "@/features/story/paths";
-import { isAbort } from "@/shared/api/errors";
 import { useErrors } from "@/shared/errors/errors-context";
 import type { ChatBubble } from "@/shared/ui/chat/ChatMessage";
 import { forgetAllJobs, forgetJob, rememberJob, resumableJobs } from "./resumable";
+import { chatKey, revisers } from "./revisions";
 import { ActionsContext, StateContext, type ChatContext, type StoryActions } from "./story-context";
-import { initialState, reducer, type ChatKey, type JobKey } from "./story-reducer";
+import { initialState, reducer, type Action, type ChatKey, type JobKey } from "./story-reducer";
+import { useAutosave } from "./use-autosave";
+import { useJobs } from "./use-jobs";
 
 /** How long changed fields glow after an AI revision. */
 const HIGHLIGHT_MS = 2600;
-/** Typing pause before a hand edit is saved. */
-const SAVE_DELAY_MS = 600;
 
 const toBubbles = (history: HistoryMessage[]): ChatBubble[] =>
   history
@@ -46,149 +42,8 @@ export function StoryProvider({ children }: { children: ReactNode }) {
   /** Grows when a new cast replaces the play; answers to requests of an older play are dropped. */
   const epoch = useRef(0);
 
-  // ---------- local edits and saving ----------
-
-  const editVersion = useRef(new Map<EditKey, number>());
-  const savedVersion = useRef(new Map<EditKey, number>());
-  const saveTimers = useRef(new Map<EditKey, ReturnType<typeof setTimeout>>());
-  const saveChains = useRef(new Map<EditKey, Promise<void>>());
-
-  const dirtyKeys = useCallback(
-    () => [...editVersion.current].filter(([key, v]) => v > (savedVersion.current.get(key) ?? 0)).map(([key]) => key),
-    [],
-  );
-
-  /** Takes the Story Bible the backend answered with, keeping what the user has typed since. */
-  const receive = useCallback(
-    (server: StoryBible, from: number) => {
-      if (from !== epoch.current) return;
-      const story = withLocalEdits(server, stateRef.current.story, dirtyKeys());
-      stateRef.current = { ...stateRef.current, story };
-      dispatch({ type: "storyReceived", story });
-    },
-    [dirtyKeys],
-  );
-
-  /** Sends the local version of one edited part to the backend. */
-  const performSave = useCallback(async (key: EditKey): Promise<StoryBible | null> => {
-    const story = stateRef.current.story;
-    if (!story) return null;
-    if (key === "outline") return story.outline ? api.saveOutline(story.outline) : null;
-    const [kind, value, sceneValue] = key.split(":");
-    const act = story.acts.find((item) => item.number === Number(value));
-    if (!act) return null;
-    switch (kind) {
-      case "act":
-        return api.saveAct(act.number, act.summary, act.dramatic_function);
-      case "scenes":
-        return api.saveStructure(act.number, act.scenes.map(toPlan));
-      case "scene": {
-        const scene = act.scenes.find((item) => item.number === Number(sceneValue));
-        return scene ? api.saveScene(act.number, scene.number, toPlan(scene)) : null;
-      }
-      default:
-        return api.saveText(act.number, act.scene_texts);
-    }
-  }, []);
-
-  /** Saves one part now (one save per part at a time, in order). Resolves when it is saved or failed. */
-  const flush = useCallback(
-    (key: EditKey): Promise<void> => {
-      clearTimeout(saveTimers.current.get(key));
-      saveTimers.current.delete(key);
-      const from = epoch.current;
-      const previous = saveChains.current.get(key) ?? Promise.resolve();
-      const next = previous.then(async () => {
-        const version = editVersion.current.get(key) ?? 0;
-        if (from !== epoch.current || version <= (savedVersion.current.get(key) ?? 0)) return;
-        try {
-          const server = await performSave(key);
-          savedVersion.current.set(key, Math.max(version, savedVersion.current.get(key) ?? 0));
-          if (server) receive(server, from);
-        } catch (error) {
-          // the edit stays local; the next edit or step saves it again
-          if (from === epoch.current) showError(error);
-        }
-      });
-      saveChains.current.set(key, next);
-      return next;
-    },
-    [performSave, receive, showError],
-  );
-
-  /** Saves every edited part whose key starts with one of the prefixes ("" = all). */
-  const flushAll = useCallback(
-    (...prefixes: string[]) =>
-      Promise.all(dirtyKeys().filter((key) => prefixes.some((p) => key.startsWith(p))).map(flush)).then(() => undefined),
-    [dirtyKeys, flush],
-  );
-
-  /** A part was edited locally: save it after a pause (or at once). */
-  const edited = useCallback(
-    (key: EditKey, delay = SAVE_DELAY_MS) => {
-      editVersion.current.set(key, (editVersion.current.get(key) ?? 0) + 1);
-      clearTimeout(saveTimers.current.get(key));
-      saveTimers.current.set(key, setTimeout(() => void flush(key), delay));
-    },
-    [flush],
-  );
-
-  // ---------- long requests ----------
-
-  const running = useRef(new Set<JobKey>());
-  const controllers = useRef(new Map<JobKey, AbortController>());
-
-  // A reload or a closed tab cancels the running requests: that is not a failure to report or to forget.
-  const unloading = useRef(false);
-  useEffect(() => {
-    const leave = () => {
-      unloading.current = true;
-    };
-    // back from the back-forward cache: the page lives on
-    const back = () => {
-      unloading.current = false;
-    };
-    window.addEventListener("pagehide", leave);
-    window.addEventListener("beforeunload", leave);
-    window.addEventListener("pageshow", back);
-    return () => {
-      window.removeEventListener("pagehide", leave);
-      window.removeEventListener("beforeunload", leave);
-      window.removeEventListener("pageshow", back);
-    };
-  }, []);
-
-  /**
-   * Runs one request at a time per key; the key is shown as running (veils, disabled buttons) until it ends.
-   * Resolves to the answer, or undefined if it failed (banner) or was aborted.
-   */
-  const runJob = useCallback(
-    async <T,>(key: JobKey, work: (signal: AbortSignal) => Promise<T>): Promise<T | undefined> => {
-      if (running.current.has(key)) return undefined;
-      const from = epoch.current;
-      const controller = new AbortController();
-      running.current.add(key);
-      controllers.current.set(key, controller);
-      dispatch({ type: "jobStarted", key });
-      try {
-        const result = await work(controller.signal);
-        if (controller.signal.aborted || from !== epoch.current) return undefined;
-        dispatch({ type: "jobEnded", key });
-        return result;
-      } catch (error) {
-        if (isAbort(error) || controller.signal.aborted || from !== epoch.current || unloading.current) return undefined;
-        dispatch({ type: "jobEnded", key, failed: true });
-        showError(error);
-        return undefined;
-      } finally {
-        if (controllers.current.get(key) === controller) {
-          running.current.delete(key);
-          controllers.current.delete(key);
-        }
-      }
-    },
-    [showError],
-  );
+  const { receive, edited, flush, flushAll, reset: resetSaves } = useAutosave({ epoch, stateRef, dispatch, showError });
+  const { runJob, isRunning, abortAll, isUnloading } = useJobs({ epoch, dispatch, showError });
 
   /** Runs a request that answers with the Story Bible and takes the answer. */
   const runStoryJob = useCallback(
@@ -209,19 +64,13 @@ export function StoryProvider({ children }: { children: ReactNode }) {
   /** A new cast starts a new play on the backend: everything of the old play is dropped. */
   const resetPlay = useCallback(() => {
     epoch.current += 1;
-    controllers.current.forEach((controller) => controller.abort());
-    controllers.current.clear();
-    running.current.clear();
-    saveTimers.current.forEach((timer) => clearTimeout(timer));
-    saveTimers.current.clear();
-    saveChains.current.clear();
-    editVersion.current.clear();
-    savedVersion.current.clear();
+    abortAll();
+    resetSaves();
     historyRequested.current.clear();
     loading.current = false;
     forgetAllJobs();
     dispatch({ type: "reset" });
-  }, []);
+  }, [abortAll, resetSaves]);
 
   const previousCastGeneration = useRef(castGeneration);
   useEffect(() => {
@@ -277,7 +126,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { loaded, story, jobs, failed } = state;
     if (!onPlay || !loaded || !story) return;
-    const idle = (key: JobKey) => !jobs.includes(key) && !failed.includes(key) && !running.current.has(key);
+    const idle = (key: JobKey) => !jobs.includes(key) && !failed.includes(key) && !isRunning(key);
     if (!story.outline) {
       if (idle("outline")) generateOutline();
       return;
@@ -291,7 +140,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
     const scene = nextSceneToPlan(act);
     const busy = jobs.some((key) => key.startsWith(`plan:${act.number}:`) || key.startsWith(`scene:${act.number}:`));
     if (scene !== null && !busy && idle(`plan:${act.number}:${scene}`)) planScene(act.number, scene);
-  }, [state, onPlay, generateOutline, stageAct, planScene]);
+  }, [state, onPlay, isRunning, generateOutline, stageAct, planScene]);
 
   // ---------- chat ----------
 
@@ -317,114 +166,39 @@ export function StoryProvider({ children }: { children: ReactNode }) {
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(highlightTimer.current), []);
 
+  /** Puts an edit into the fields at once, so a save started right after it sends it. */
+  const apply = useCallback((action: Action) => {
+    dispatch(action);
+    stateRef.current = reducer(stateRef.current, action);
+  }, []);
+
   /**
    * Sends the draft to the agent of the page with the data as it is in the fields. When the agent applies
    * changes, its answer carries the changed data: the changed parts are put into the fields, saved and glow.
    */
   const sendMessage = useCallback(
     async ({ kind, act: n }: ChatContext) => {
-      const { draft, story, typing, chats } = stateRef.current;
+      const { draft, story, typing } = stateRef.current;
       const text = draft.trim();
       if (!text || typing || !story) return;
-      const key: ChatKey = kind === "outline" ? "outline" : kind === "acts" ? "acts" : `act:${n ?? 0}`;
-      const act = story.acts.find((item) => item.number === n);
-      const counts = { acts: story.acts.length, scenes: act?.scenes.length ?? 0 };
-      const history = [...(chats[key] ?? [])].reverse();
-      const lastReply = history.find((m) => m.role === "ai")?.text ?? "";
-      const previousMessage = history.find((m) => m.role === "user")?.text ?? "";
-      const pending = predictTargets(kind, text, lastReply, counts, previousMessage).map((target) => {
-        if (kind === "outline") return `outline:${target}`;
-        if (kind === "acts") return target;
-        return target === "add" ? `add:${n}` : `scene:${n}:${target.slice(6)}`;
-      });
-      dispatch({ type: "messageSent", key, text, about: aboutLabel(kind, text, counts), pending });
+      const key = chatKey(kind, n);
+      dispatch({ type: "messageSent", key, text });
 
       const from = epoch.current;
-      const updated: string[] = [];
-      const highlight: string[] = [];
       try {
-        if (kind === "outline" && story.outline) {
-          const sent = story.outline;
-          const result = await api.reviseOutline(sent, text);
-          if (from !== epoch.current) return;
-          const fields = changedOutlineFields(sent, result.outline);
-          if (fields.length) {
-            const patch = Object.fromEntries(fields.map((f) => [f, result.outline[f]])) as Partial<Outline>;
-            dispatch({ type: "outlineEdited", patch });
-            stateRef.current = reducer(stateRef.current, { type: "outlineEdited", patch });
-            edited("outline", 0);
-          }
-          updated.push(...fields.map((f) => OUTLINE_FIELD_LABEL[f]));
-          highlight.push(...fields.map((f) => `outline:${f}`));
-          dispatch({ type: "replyReceived", key, text: result.reply, updated, highlight });
-        } else if (kind === "acts") {
-          const sent = story.acts.map(({ number, summary, dramatic_function }) => ({ number, summary, dramatic_function }));
-          const result = await api.reviseActs(sent, text);
-          if (from !== epoch.current) return;
-          for (const number of changedActNumbers(sent, result.acts)) {
-            const revised = result.acts.find((item) => item.number === number)!;
-            const action = { type: "actEdited" as const, number, summary: revised.summary, dramatic_function: revised.dramatic_function };
-            dispatch(action);
-            stateRef.current = reducer(stateRef.current, action);
-            edited(`act:${number}`, 0);
-            const before = sent.find((item) => item.number === number)!;
-            updated.push(before.dramatic_function !== revised.dramatic_function ? `${actName(number)} · dramatic function` : actName(number));
-            highlight.push(`act:${number}`);
-          }
-          dispatch({ type: "replyReceived", key, text: result.reply, updated, highlight });
-        } else if ((kind === "structure" || kind === "scenes") && act && n !== undefined) {
-          const sent = act.scenes.map(toPlan);
-          const result =
-            kind === "structure" ? await api.reviseStructure(n, sent, text) : await api.reviseScenes(n, sent, text);
-          if (from !== epoch.current) return;
-          dispatch({ type: "placesReceived", places: result.places });
-          const changed = changedSceneIndexes(sent, result.scenes);
-          if (kind === "structure" && (changed.length || result.scenes.length !== sent.length)) {
-            const action = { type: "scenesEdited" as const, number: n, scenes: toScenes(result.scenes) };
-            dispatch(action);
-            stateRef.current = reducer(stateRef.current, action);
-            edited(`scenes:${n}`, 0);
-            if (result.scenes.length < sent.length) updated.push(`${sent.length - result.scenes.length} scene(s) cut`);
-          }
-          if (kind === "scenes") {
-            for (const i of changed) {
-              const plan = result.scenes[i];
-              if (!act.scenes[i]) continue;
-              const action = { type: "sceneEdited" as const, number: n, scene: i + 1, patch: toPlan(plan) };
-              dispatch(action);
-              stateRef.current = reducer(stateRef.current, action);
-              edited(`scene:${n}:${i + 1}`, 0);
-            }
-          }
-          updated.unshift(...changed.map((i) => `Scene ${i + 1}`));
-          highlight.push(...changed.map((i) => `scene:${n}:${i + 1}`));
-          dispatch({ type: "replyReceived", key, text: result.reply, updated, highlight });
-        } else if (kind === "text" && act && n !== undefined) {
-          const sent = act.scene_texts;
-          const result = await api.reviseText(n, sent, text);
-          if (from !== epoch.current) return;
-          const numbers = changedSceneTextNumbers(sent, result.scene_texts);
-          if (numbers.length) {
-            const sceneTexts = sent.map((item) =>
-              numbers.includes(item.scene_number) ? result.scene_texts.find((r) => r.scene_number === item.scene_number)! : item,
-            );
-            const action = { type: "sceneTextsEdited" as const, number: n, sceneTexts };
-            dispatch(action);
-            stateRef.current = reducer(stateRef.current, action);
-            edited(`text:${n}`, 0);
-          }
-          for (const number of numbers) {
-            const before = sent.find((item) => item.scene_number === number)!.text;
-            const after = result.scene_texts.find((item) => item.scene_number === number)!.text;
-            updated.push(`Scene ${number} · text`);
-            highlight.push(...changedBlocks(before, after).map((i) => `block:${n}:${number}:${i}`));
-          }
-          dispatch({ type: "replyReceived", key, text: result.reply, updated, highlight });
-        } else {
+        const revision = await revisers[kind](story, text, story.acts.find((item) => item.number === n));
+        if (from !== epoch.current) return;
+        if (!revision) {
           dispatch({ type: "replyFailed", key });
           return;
         }
-        if (highlight.length) {
+        if (revision.places) dispatch({ type: "placesReceived", places: revision.places });
+        for (const edit of revision.edits) {
+          apply(edit.action);
+          edited(edit.key, 0);
+        }
+        dispatch({ type: "replyReceived", key, text: revision.reply, updated: revision.updated, highlight: revision.highlight });
+        if (revision.highlight.length) {
           clearTimeout(highlightTimer.current);
           highlightTimer.current = setTimeout(() => dispatch({ type: "clearHighlight" }), HIGHLIGHT_MS);
         }
@@ -434,7 +208,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
         showError(error);
       }
     },
-    [edited, showError],
+    [apply, edited, showError],
   );
 
   // ---------- outline and acts ----------
@@ -552,7 +326,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
       rememberJob(`text:${n}`);
       const done = await runStoryJob(`text:${n}`, (signal) => api.generateText(n, { signal }));
       // a reload cancelled it: it stays remembered and starts again on the next load
-      if (unloading.current) return;
+      if (isUnloading()) return;
       forgetJob(`text:${n}`);
       if (done) {
         // the backend starts the act page's chat anew with the new text
@@ -560,7 +334,7 @@ export function StoryProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "chatCleared", key: `act:${n}` });
       }
     },
-    [runStoryJob],
+    [runStoryJob, isUnloading],
   );
 
   const writeText = useCallback(
@@ -589,9 +363,9 @@ export function StoryProvider({ children }: { children: ReactNode }) {
     async (n: number) => {
       rememberJob(`record:${n}`);
       await runStoryJob(`record:${n}`, (signal) => api.approveText(n, { signal }));
-      if (!unloading.current) forgetJob(`record:${n}`);
+      if (!isUnloading()) forgetJob(`record:${n}`);
     },
-    [runStoryJob],
+    [runStoryJob, isUnloading],
   );
 
   const approveText = useCallback(

@@ -1,7 +1,6 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
-import { UpdatingOverlay } from "./UpdatingOverlay";
 
 interface FieldCardProps {
   num: number;
@@ -14,14 +13,12 @@ interface FieldCardProps {
   highlighted?: boolean;
   /** Red border: a required field left empty after CREATE / SAVE was pressed. */
   invalid?: boolean;
-  /** "UPDATING" overlay while the AI is about to rewrite this field. */
-  updating?: boolean;
   className?: string;
   children: ReactNode;
 }
 
 /** A field card (`.fcard`): gold border while focused, stretches with its grid row. */
-export function FieldCard({ num, label, hint, compact, highlighted, invalid, updating = false, className, children }: FieldCardProps) {
+export function FieldCard({ num, label, hint, compact, highlighted, invalid, className, children }: FieldCardProps) {
   return (
     <motion.div
       layout="position"
@@ -41,7 +38,6 @@ export function FieldCard({ num, label, hint, compact, highlighted, invalid, upd
         {hint && <span className="ml-auto font-sans text-[10px] tracking-[1.5px] text-faint">{hint}</span>}
       </div>
       {children}
-      <UpdatingOverlay show={updating} />
     </motion.div>
   );
 }

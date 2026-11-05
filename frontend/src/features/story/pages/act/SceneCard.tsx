@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
 import { GenerationVeil } from "@/shared/ui/GenerationVeil";
 import { Notice } from "@/shared/ui/Notice";
-import { UpdatingOverlay } from "@/shared/ui/UpdatingOverlay";
 
 interface SceneCardProps {
   number: number;
@@ -12,7 +11,6 @@ interface SceneCardProps {
   whatHappens: string;
   /** Move / cut / edit buttons, or a small note on the right. */
   tools?: ReactNode;
-  updating?: boolean;
   highlighted?: boolean;
   /** Veil while the plan of this scene is being written. */
   planning?: boolean;
@@ -30,7 +28,6 @@ export function SceneCard({
   who,
   whatHappens,
   tools,
-  updating,
   highlighted,
   planning,
   dimmed,
@@ -70,25 +67,7 @@ export function SceneCard({
         {notice && <Notice className="mt-3">{notice}</Notice>}
       </div>
       <div className="flex items-start gap-[6px]">{tools}</div>
-      <UpdatingOverlay show={!!updating && !planning} className="rounded-[10px]" />
       <GenerationVeil show={!!planning} label={`PLANNING SCENE ${number}`} line="Setting the place, who is on stage and what happens…" />
-    </article>
-  );
-}
-
-/** Placeholder card while the agent adds a scene. */
-export function AddingSceneCard({ number }: { number: number }) {
-  return (
-    <article aria-label="Adding a scene" className="relative grid min-h-[120px] grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-[10px] border border-line bg-card py-[18px] pr-5 pl-4">
-      <div aria-hidden className="text-center font-serif text-[32px] leading-none text-gold italic">
-        {number}
-      </div>
-      <div>
-        {["40%", "85%", "65%"].map((width) => (
-          <div key={width} className="my-[5px] h-[9px] rounded-[5px] bg-line-subtle" style={{ width }} />
-        ))}
-      </div>
-      <UpdatingOverlay show label="ADDING A SCENE" className="rounded-[10px]" />
     </article>
   );
 }
