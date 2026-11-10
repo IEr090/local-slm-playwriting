@@ -14,19 +14,16 @@ from anton.application.llm_schemas.text_generation import (
     LineEdit,
 )
 from anton.application.agents.scene_targets import SceneView
-from anton.application.mappers.text_mapper import (
-    apply_line_edits,
-    ending,
-    format_lines,
+from anton.application.mappers.text_mapper import apply_line_edits, ending, format_lines, to_history_entries
+from anton.application.scene_writer import SceneWriter
+from anton.application.text_service import TextService
+from anton.application.validators.scene_text_checks import (
     looping_phrases,
     narrated_lines,
     repeated_lines,
-    to_history_entries,
     unknown_speakers,
     without_repeats,
 )
-from anton.application.scene_writer import SceneWriter
-from anton.application.text_service import TextService
 from anton.domain.models import Cast, CharacterHistoryEntry, SceneText
 from anton.errors import SceneNotFoundError, StoryOrderError
 from tests.unit.fakes import FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, ScriptedSLMClient

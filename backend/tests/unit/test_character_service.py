@@ -2,10 +2,17 @@ import json
 from unittest import IsolatedAsyncioTestCase
 from uuid import UUID
 
+from anton.application.agents.character_target import CharacterTarget
+from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.character_service import CARD_SOURCE_FIELDS, CharacterService
 from anton.errors import CastNotFoundError, CharacterNotFoundError
 from anton.domain.models import Cast, Character, CharacterCard, CharacterHistoryEntry
 from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, make_draft, make_generated_cast
+
+
+def make_edit_agent() -> ChatEditAgent[Character]:
+    """Create the edit agent of characters with a fake model client; the tests here never chat."""
+    return ChatEditAgent(FakeSLMClient(), CharacterTarget(), create_checkpointer())
 
 
 OLD_CARD = CharacterCard(role_label="protagonist", tagline="Old tagline", traits=["A", "B", "C"], wants="Old.", fears="Old.")
@@ -25,7 +32,7 @@ class CreateCharacterTest(IsolatedAsyncioTestCase):
         """Create the service with a fake model client and an empty repository."""
         self.client = FakeSLMClient(CARD)
         self.repository = InMemoryCastRepository()
-        self.service = CharacterService(self.client, self.repository)
+        self.service = CharacterService(self.client, self.repository, make_edit_agent())
         self.draft = make_draft()
 
     async def test_gives_new_character_an_id(self) -> None:
@@ -65,7 +72,7 @@ class GenerateCastTest(IsolatedAsyncioTestCase):
     async def test_saves_generated_cast(self) -> None:
         """Save the generated cast in the repository."""
         repository = InMemoryCastRepository()
-        service = CharacterService(FakeSLMClient(make_generated_cast(), CARD), repository)
+        service = CharacterService(FakeSLMClient(make_generated_cast(), CARD), repository, make_edit_agent())
 
         cast = await service.generate_cast("A theatre in Vienna.")
 
@@ -78,7 +85,7 @@ class GetCastTest(IsolatedAsyncioTestCase):
 
     async def test_raises_without_saved_cast(self) -> None:
         """Report that no cast has been generated yet."""
-        service = CharacterService(FakeSLMClient(CARD), InMemoryCastRepository())
+        service = CharacterService(FakeSLMClient(CARD), InMemoryCastRepository(), make_edit_agent())
 
         with self.assertRaises(CastNotFoundError):
             service.get_cast()
@@ -91,7 +98,7 @@ class EditCharacterTest(IsolatedAsyncioTestCase):
         """Create the service with a fake model client and a saved cast of two characters."""
         self.client = FakeSLMClient(CARD)
         self.repository = InMemoryCastRepository(make_cast())
-        self.service = CharacterService(self.client, self.repository)
+        self.service = CharacterService(self.client, self.repository, make_edit_agent())
 
     async def test_replaces_only_edited_character(self) -> None:
         """Keep the id, the order and the other character unchanged."""

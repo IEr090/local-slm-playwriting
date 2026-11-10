@@ -21,15 +21,19 @@ class TextTarget:
         replacements = line_replacements(changes)
         if not replacements:
             return None
-        edits = [LineEdit(scene_number=scene, old_line=old, new_lines=[to_line(new)] if new.strip() else []) for scene, old, new in replacements]
+        edits = []
+        for scene_number, old_line, new_line in replacements:
+            new_lines = []
+            if new_line.strip():
+                new_lines.append(to_line(new_line))
+            edits.append(LineEdit(scene_number=scene_number, old_line=old_line, new_lines=new_lines))
         return self.apply(data, EditedSceneTexts(edits))
 
     def apply(self, data: list[SceneText], edited: EditedSceneTexts) -> list[SceneText]:
         """Apply the model's line edits to their scenes; scene numbers the act does not have are ignored."""
-        return [
-            SceneText(
-                scene_number=item.scene_number,
-                text=apply_line_edits(item.text, [edit for edit in edited.root if edit.scene_number == item.scene_number]),
-            )
-            for item in data
-        ]
+        scene_texts = []
+        for item in data:
+            scene_edits = [edit for edit in edited.root if edit.scene_number == item.scene_number]
+            text = apply_line_edits(item.text, scene_edits)
+            scene_texts.append(SceneText(scene_number=item.scene_number, text=text))
+        return scene_texts

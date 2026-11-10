@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -8,6 +9,9 @@ from anton.api.error_handlers import add_error_handlers
 from anton.api.routers.act_router import router as act_router
 from anton.api.routers.character_router import router as character_router
 from anton.api.routers.story_router import router as story_router
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager

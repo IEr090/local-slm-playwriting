@@ -12,12 +12,18 @@ from anton.main import app
 from tests.unit.fakes import CARD, FailingSLMClient, FakeSLMClient, InMemoryCastRepository, ScriptedSLMClient, make_draft
 
 
+def make_service(client, repository: InMemoryCastRepository) -> CharacterService:
+    """Create the character service with an edit agent that is never used to chat."""
+    edit_agent = ChatEditAgent(FakeSLMClient(), CharacterTarget(), create_checkpointer())
+    return CharacterService(client, repository, edit_agent)
+
+
 class CreateCharacterRouteTest(TestCase):
     """Test the endpoint that creates a character."""
 
     def setUp(self) -> None:
         """Replace the character service with one that uses a fake model client."""
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(FakeSLMClient(CARD), InMemoryCastRepository())
+        app.dependency_overrides[get_character_service] = lambda: make_service(FakeSLMClient(CARD), InMemoryCastRepository())
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -50,7 +56,7 @@ class SavedCastRouteTest(TestCase):
     def setUp(self) -> None:
         """Replace the character service with one that uses a fake model client and an in-memory cast."""
         repository = InMemoryCastRepository()
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(FakeSLMClient(CARD), repository)
+        app.dependency_overrides[get_character_service] = lambda: make_service(FakeSLMClient(CARD), repository)
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -104,7 +110,7 @@ class ModelErrorRouteTest(TestCase):
 
     def generate_with(self, error: Exception):
         """Generate a cast with a model client that raises the given error."""
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(FailingSLMClient(error), InMemoryCastRepository())
+        app.dependency_overrides[get_character_service] = lambda: make_service(FailingSLMClient(error), InMemoryCastRepository())
         return TestClient(app).post("/api/characters/generate", json={"premise": "A theatre in Vienna."})
 
     def test_unreachable_model_returns_503(self) -> None:

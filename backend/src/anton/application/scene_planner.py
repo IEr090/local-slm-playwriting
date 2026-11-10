@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 from anton.application.agents.scene_targets import SceneView
@@ -6,6 +7,15 @@ from anton.application.language import echoes
 from anton.application.llm_schemas.scene_generation import GeneratedScenePlan
 from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
+
+
+logger = logging.getLogger(__name__)
+
+# A plan of a few words is no plan: the text written from it fills its lines with stage directions.
+MIN_PLAN_LENGTH = 150
+# A plan that shares this much of its four-word phrases with an earlier one tells the same scene again.
+SAME_PLAN = 0.3
+PLAN_PHRASE_WORDS = 4
 
 
 class ScenePlanner:
@@ -42,10 +52,16 @@ class ScenePlanner:
         problem = _problem(generated, earlier_scenes)
         if problem:
             # A small model sometimes returns a phrase, its instructions or the plan of an earlier scene; one more try.
+            logger.info("Retrying scene plan reason=%s", problem)
             retried = await self._plan(f"{user_prompt}\n\n{problem}")
             if not _problem(retried, earlier_scenes):
                 generated = retried
-        return GeneratedScenePlan(place_notes=generated.place_notes.strip(), what_happens=generated.what_happens.strip())
+            else:
+                logger.info("Kept first scene plan, retry was not better")
+        return GeneratedScenePlan(
+            place_notes=generated.place_notes.strip(),
+            what_happens=generated.what_happens.strip(),
+        )
 
     async def _plan(self, user_prompt: str) -> GeneratedScenePlan:
         """Ask the model for the plan of a scene."""
@@ -55,14 +71,6 @@ class ScenePlanner:
             response_model=GeneratedScenePlan,
             think=True,
         )
-
-
-# A plan of a few words is no plan: the text written from it fills its lines with stage directions.
-MIN_PLAN_LENGTH = 150
-
-
-# A plan that shares this much of its four-word phrases with an earlier one tells the same scene again.
-SAME_PLAN = 0.3
 
 
 def _problem(plan: GeneratedScenePlan, earlier: list[SceneView]) -> str | None:
@@ -80,13 +88,18 @@ def _problem(plan: GeneratedScenePlan, earlier: list[SceneView]) -> str | None:
 def _shared_phrases(text: str, earlier: str) -> float:
     """Return the share of the four-word phrases of a text that also stand in an earlier text."""
     phrases = _phrases(text)
-    return len(phrases & _phrases(earlier)) / len(phrases) if phrases else 0.0
+    if not phrases:
+        return 0.0
+    return len(phrases & _phrases(earlier)) / len(phrases)
 
 
 def _phrases(text: str) -> set[str]:
     """Return the four-word phrases of a text."""
     words = re.findall(r"\w+", text.casefold())
-    return {" ".join(words[i:i + 4]) for i in range(len(words) - 3)}
+    phrases = set()
+    for start in range(len(words) - PLAN_PHRASE_WORDS + 1):
+        phrases.add(" ".join(words[start:start + PLAN_PHRASE_WORDS]))
+    return phrases
 
 
 def _too_thin(plan: GeneratedScenePlan) -> bool:

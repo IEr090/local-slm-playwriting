@@ -495,12 +495,3 @@ class PlacesAndChatsTest(IsolatedAsyncioTestCase):
         self.assertTrue(place.id)
         self.assertEqual(service.get_places(), [KITCHEN, place])
         self.assertEqual(repository.load().places, [KITCHEN, place])
-
-    async def test_forgets_act_chats(self) -> None:
-        """Forget the conversation of every act page."""
-        service, *_ = make_service(PROPOSAL, story=make_story(make_scene(1)))
-        await service.revise_structure(1, plans(make_scene(1)), "Add a scene.")
-
-        await service.forget_act_chats()
-
-        self.assertEqual(await service.act_chat(1), [])

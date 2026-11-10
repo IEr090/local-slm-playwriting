@@ -2,17 +2,18 @@ from unittest import TestCase
 
 from fastapi.testclient import TestClient
 
-from anton.api.dependencies import get_character_service, get_scene_service, get_story_service
+from anton.api.dependencies import get_character_service, get_story_service
 from anton.application.character_service import CharacterService
 from anton.application.story_service import StoryService
 from anton.domain.models import StoryBible
 from anton.main import app
+from anton.application.agents.act_chat import ActChat
 from anton.application.agents.acts_target import ActsTarget
+from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.agents.outline_target import OutlineTarget
 from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, make_generated_cast
 from tests.unit.test_story_service import ACTS_PROPOSAL, GENERATED_ACTS, GENERATED_OUTLINE, PROPOSAL, summaries
-from tests.unit.test_scene_service import make_service as make_scene_service
 from tests.unit.test_story_models import make_outline
 
 
@@ -27,11 +28,13 @@ class StoryRouteTest(TestCase):
         outline_agent = ChatEditAgent(FakeSLMClient(GENERATED_OUTLINE, PROPOSAL), OutlineTarget(), create_checkpointer())
         acts_agent = ChatEditAgent(FakeSLMClient(GENERATED_ACTS, ACTS_PROPOSAL), ActsTarget(), create_checkpointer())
         character_client = FakeSLMClient(make_generated_cast(), CARD)
-        app.dependency_overrides[get_character_service] = lambda: CharacterService(character_client, cast_repository)
-        scene_service, *_ = make_scene_service(story=StoryBible())
-        app.dependency_overrides[get_scene_service] = lambda: scene_service
+        character_agent = ChatEditAgent(character_client, CharacterTarget(), create_checkpointer())
+        app.dependency_overrides[get_character_service] = lambda: CharacterService(
+            character_client, cast_repository, character_agent,
+        )
+        act_chat = ActChat(character_client, create_checkpointer())
         app.dependency_overrides[get_story_service] = lambda: StoryService(
-            self.story_repository, cast_repository, outline_agent, acts_agent,
+            self.story_repository, cast_repository, outline_agent, acts_agent, act_chat,
         )
         self.client = TestClient(app)
 

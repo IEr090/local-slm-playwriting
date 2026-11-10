@@ -47,11 +47,21 @@ class StructureTarget:
         """Take the whole new list of scenes from the model; the order of the list is the order of the act."""
         return _board(edited.scenes, edited.new_places)
 
+    def parse_changes(self, data: SceneBoard, changes: str) -> SceneBoard | None:
+        """Never parse the changes without the model: the structure is rewritten as a whole list."""
+        return None
+
     def generate_input(self, source: dict[str, str]) -> str:
         """Give the model the outline, the act, the acts before it, the places and the cast."""
-        return "\n\n".join(f"# {title}\n\n{source[key]}" for key, title in (
-            ("outline", "OUTLINE"), ("act", "ACT"), ("earlier_acts", "EARLIER ACTS"), ("places", "PLACES"), ("cast", "CAST"),
-        )) + f"\n\n# LANGUAGE\n\n{source.get('language', 'English')}"
+        sections = [
+            ("outline", "OUTLINE"), ("act", "ACT"), ("earlier_acts", "EARLIER ACTS"),
+            ("places", "PLACES"), ("cast", "CAST"),
+        ]
+        blocks = []
+        for key, title in sections:
+            blocks.append(f"# {title}\n\n{source[key]}")
+        blocks.append(f"# LANGUAGE\n\n{source.get('language', 'English')}")
+        return "\n\n".join(blocks)
 
     def from_generated(self, generated: GeneratedStructure) -> SceneBoard:
         """Number the generated scenes from one."""
@@ -71,7 +81,7 @@ class ScenesTarget:
         return [scene.model_dump() for scene in data.scenes]
 
     def parse_changes(self, data: SceneBoard, changes: str) -> SceneBoard | None:
-        """Apply changes written as `scene N field_key: new value` without the model; None if they are not written so."""
+        """Apply changes written as `scene N field_key: new value` without the model; None if not written so."""
         values = field_values(changes, {"place", "place_notes", "characters", "what_happens"}, prefix="scene")
         if not values:
             return None
@@ -86,26 +96,38 @@ class ScenesTarget:
     def apply(self, data: SceneBoard, edited: EditedScenes) -> SceneBoard:
         """Replace only the scenes the model edited; numbers the act does not have are ignored."""
         by_number = {scene.number: scene for scene in edited.scenes}
-        scenes = [
-            SceneView(**(by_number[scene.number].model_dump() | {"what_happens": by_number[scene.number].what_happens.strip()}))
-            if scene.number in by_number else scene
-            for scene in data.scenes
-        ]
+        scenes = []
+        for scene in data.scenes:
+            edited_scene = by_number.get(scene.number)
+            if edited_scene is None:
+                scenes.append(scene)
+                continue
+            values = edited_scene.model_dump()
+            values["what_happens"] = edited_scene.what_happens.strip()
+            scenes.append(SceneView(**values))
         return SceneBoard(scenes=scenes, new_places=_places(edited.new_places))
 
 
 def _board(scenes: list[GeneratedStructureScene], places: list[GeneratedPlace]) -> SceneBoard:
     """Number the scenes in their order and keep the proposed places."""
-    return SceneBoard(
-        scenes=[
-            SceneView(number=number, place=scene.place.strip(), place_notes="", characters=scene.characters,
-                      what_happens=scene.what_happens.strip())
-            for number, scene in enumerate(scenes, start=1)
-        ],
-        new_places=_places(places),
-    )
+    views = []
+    for number, scene in enumerate(scenes, start=1):
+        views.append(SceneView(
+            number=number,
+            place=scene.place.strip(),
+            place_notes="",
+            characters=scene.characters,
+            what_happens=scene.what_happens.strip(),
+        ))
+    return SceneBoard(scenes=views, new_places=_places(places))
 
 
 def _places(places: list[GeneratedPlace]) -> list[PlaceDraft]:
     """Turn the proposed places into place drafts with trimmed text."""
-    return [PlaceDraft(**{key: value.strip() for key, value in place.model_dump().items()}) for place in places]
+    drafts = []
+    for place in places:
+        trimmed = {}
+        for key, value in place.model_dump().items():
+            trimmed[key] = value.strip()
+        drafts.append(PlaceDraft(**trimmed))
+    return drafts

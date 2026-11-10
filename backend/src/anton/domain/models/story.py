@@ -103,11 +103,13 @@ class Act(ActSummary):
     @property
     def outdated_plans(self) -> list[int]:
         """Return the numbers of scenes whose plan was written before an earlier scene changed."""
-        return [
-            scene.number
-            for index, scene in enumerate(self.scenes)
-            if scene.plan_built_from is not None and scene.plan_built_from != _plans(self.scenes[:index])
-        ]
+        numbers = []
+        for index, scene in enumerate(self.scenes):
+            if scene.plan_built_from is None:
+                continue
+            if scene.plan_built_from != _plans(self.scenes[:index]):
+                numbers.append(scene.number)
+        return numbers
 
 
 class StoryBible(BaseModel):

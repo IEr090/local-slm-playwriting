@@ -50,24 +50,22 @@ def get_story_repository() -> StoryRepository:
     return JsonStoryRepository(get_settings().data_dir / "story_bible.json")
 
 
-def get_character_service(
-    client: Annotated[SLMClient, Depends(get_slm_client)],
-    repository: Annotated[CastRepository, Depends(get_cast_repository)],
-) -> CharacterService:
-    """Create the character service with the configured SLM client and cast repository."""
-    return CharacterService(client, repository)
-
-
-CharacterServiceDep = Annotated[CharacterService, Depends(get_character_service)]
-
-
 @lru_cache
 def get_edit_agent() -> ChatEditAgent[Character]:
     """Create one agent that edits characters, with a saved store of conversations, for the whole application."""
     return ChatEditAgent(get_slm_client(), CharacterTarget(), create_checkpointer(chat_file("characters")))
 
 
-EditAgentDep = Annotated[ChatEditAgent[Character], Depends(get_edit_agent)]
+def get_character_service(
+    client: Annotated[SLMClient, Depends(get_slm_client)],
+    repository: Annotated[CastRepository, Depends(get_cast_repository)],
+    edit_agent: Annotated[ChatEditAgent[Character], Depends(get_edit_agent)],
+) -> CharacterService:
+    """Create the character service with the configured SLM client, cast repository and edit agent."""
+    return CharacterService(client, repository, edit_agent)
+
+
+CharacterServiceDep = Annotated[CharacterService, Depends(get_character_service)]
 
 
 @lru_cache
@@ -82,23 +80,24 @@ def get_acts_agent() -> ChatEditAgent[list[ActSummary]]:
     return ChatEditAgent(get_slm_client(), ActsTarget(), create_checkpointer(chat_file("acts")))
 
 
+@lru_cache
+def get_act_chat() -> ActChat:
+    """Create the chat of the act pages with a saved store of its conversations, one per act."""
+    return ActChat(get_slm_client(), create_checkpointer(chat_file("acts-pages")))
+
+
 def get_story_service(
     story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
     cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
     outline_agent: Annotated[ChatEditAgent[Outline], Depends(get_outline_agent)],
     acts_agent: Annotated[ChatEditAgent[list[ActSummary]], Depends(get_acts_agent)],
+    act_chat: Annotated[ActChat, Depends(get_act_chat)],
 ) -> StoryService:
-    """Create the story service with the configured repositories and page agents."""
-    return StoryService(story_repository, cast_repository, outline_agent, acts_agent)
+    """Create the story service with the configured repositories, page agents and the act page chat."""
+    return StoryService(story_repository, cast_repository, outline_agent, acts_agent, act_chat)
 
 
 StoryServiceDep = Annotated[StoryService, Depends(get_story_service)]
-
-
-@lru_cache
-def get_act_chat() -> ActChat:
-    """Create the chat of the act pages with a saved store of its conversations, one per act."""
-    return ActChat(get_slm_client(), create_checkpointer(chat_file("acts-pages")))
 
 
 def get_scene_service(
