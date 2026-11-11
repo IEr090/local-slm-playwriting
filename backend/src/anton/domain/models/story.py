@@ -128,6 +128,17 @@ class StoryBible(BaseModel):
         """Tell whether the outline differs from the one the acts were built from."""
         return self.acts_built_from_outline is not None and self.acts_built_from_outline != self.outline
 
+    @computed_field
+    @property
+    def play_complete(self) -> bool:
+        """Tell whether the acts are approved and the text of every act is approved, so the whole play can be read."""
+        if not self.acts_approved or not self.acts:
+            return False
+        for act in self.acts:
+            if act.status != "text_approved":
+                return False
+        return True
+
 
 def _plans(scenes: list[Scene]) -> list[ScenePlan]:
     """Keep only the plan fields of the scenes, so approving or numbering them does not count as a change."""

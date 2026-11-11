@@ -85,3 +85,10 @@ def require_text_draft(story: StoryBible, number: int) -> Act:
         logger.warning("Text is not written act_number=%s", number)
         raise StoryOrderError(f"The text of Act {number} has not been written yet.")
     return act
+
+
+def require_play_complete(story: StoryBible) -> None:
+    """Reject opening the whole play until the text of every act is approved."""
+    if not story.play_complete:
+        logger.warning("Play is not complete")
+        raise StoryOrderError("Approve the text of every act before opening the whole play.")

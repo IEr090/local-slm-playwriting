@@ -10,6 +10,7 @@ from anton.application.agents.character_target import CharacterTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.agents.outline_target import OutlineTarget
 from anton.application.character_service import CharacterService
+from anton.application.play_service import PlayService
 from anton.application.scene_planner import ScenePlanner
 from anton.application.scene_service import SceneService
 from anton.application.scene_writer import SceneWriter
@@ -124,3 +125,14 @@ def get_text_service(
 
 
 TextServiceDep = Annotated[TextService, Depends(get_text_service)]
+
+
+def get_play_service(
+    story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
+    cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
+) -> PlayService:
+    """Create the play service with the configured repositories."""
+    return PlayService(story_repository, cast_repository)
+
+
+PlayServiceDep = Annotated[PlayService, Depends(get_play_service)]
