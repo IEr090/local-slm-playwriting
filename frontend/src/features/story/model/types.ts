@@ -79,6 +79,8 @@ export interface StoryBible {
   places: Place[];
   acts_built_from_outline: Outline | null;
   outline_changed: boolean;
+  /** Every act has its text approved: the whole play can be read. Computed by the backend. */
+  play_complete: boolean;
 }
 
 /** A message of a chat history as the backend stores it. */
@@ -107,4 +109,36 @@ export interface SceneRevision {
 export interface TextRevision {
   reply: string;
   scene_texts: SceneText[];
+}
+
+// ---------- the finished play (GET /api/story/play) ----------
+
+export interface PlayCastMember {
+  character_id: string;
+  name: string;
+  description: string;
+}
+
+export interface PlayScene {
+  number: number;
+  place_name: string;
+  place_notes: string;
+  /** The text in play format, see model/script.ts. */
+  text: string;
+}
+
+export interface PlayAct {
+  number: number;
+  scenes: PlayScene[];
+}
+
+/** Everything the page of the whole play shows. */
+export interface Play {
+  title: string;
+  genre: string;
+  premise: string;
+  time_and_world: string;
+  act_count: number;
+  cast: PlayCastMember[];
+  acts: PlayAct[];
 }

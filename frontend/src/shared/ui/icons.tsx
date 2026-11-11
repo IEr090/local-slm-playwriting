@@ -50,3 +50,11 @@ export const ArrowDown = ({ size = 12, className }: IconProps) => (
 export const Pen = ({ size = 12, className }: IconProps) => (
   <svg {...base(size)} strokeWidth={1.6} className={className}><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>
 );
+/** Closed padlock: the text is locked. */
+export const Lock = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} strokeWidth={1.5} className={className}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+);
+/** Open padlock: the text can be edited. */
+export const Unlock = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} strokeWidth={1.5} className={className}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.6-1.8" /></svg>
+);

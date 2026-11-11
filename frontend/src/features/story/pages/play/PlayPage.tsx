@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { ACT_STATUS_LABEL, actName, firstClause, genreLabel, numberWord, roman } from "@/features/story/model/labels";
 import { canOpenAct, currentAct, isOpenAct } from "@/features/story/model/progress";
 import type { Act, OutlineField, StoryBible } from "@/features/story/model/types";
+import { paths } from "@/features/story/paths";
 import { useStoryActions, useStoryState } from "@/features/story/store/story-context";
 import type { StoryState } from "@/features/story/store/story-reducer";
 import { useTimedMessage } from "@/shared/hooks/use-timed-message";
@@ -16,6 +17,7 @@ import { Notice } from "@/shared/ui/Notice";
 import { Toast } from "@/shared/ui/Toast";
 import { StoryHeader } from "../StoryHeader";
 import { ActCard, type ActCardProps } from "./ActCard";
+import { FinaleCard } from "./FinaleCard";
 import { OutlineEditor } from "./OutlineEditor";
 import { OutlineSummary } from "./OutlineSummary";
 
@@ -151,6 +153,14 @@ export function PlayPage() {
                         <ActCard {...actCardProps(state, story, act, actions, notice.show)} />
                       </div>
                     ))}
+                {story.play_complete && (
+                  <FinaleCard
+                    title={story.outline?.title || "Untitled play"}
+                    acts={story.acts.length}
+                    scenes={story.acts.reduce((sum, act) => sum + act.scenes.length, 0)}
+                    onRead={() => navigate(paths.read)}
+                  />
+                )}
               </div>
             </div>
           </section>

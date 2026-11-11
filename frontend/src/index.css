@@ -148,6 +148,13 @@
   }
 
   .orb-core { background: radial-gradient(circle, #1f1910 0%, #0b0a08 80%); }
+
+  /* a line of the whole play that was changed by hand: a small gold dot to its left */
+  .line-changed::before {
+    content: ''; position: absolute; left: -22px; top: 14px; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--color-gold); box-shadow: 0 0 8px #c9a24b99;
+  }
+  @media (max-width: 900px) { .line-changed::before { left: -12px; } }
 }
 
 /* ---------- Story Bible: one column slides aside, the next one comes in from the right ---------- */
