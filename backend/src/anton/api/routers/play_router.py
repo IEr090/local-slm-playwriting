@@ -1,17 +1,11 @@
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
 
 from anton.api.dependencies import PlayServiceDep
+from anton.api.dto.play_dto import SceneTextEdit
 from anton.domain.models import Play
 
 
 router = APIRouter(prefix="/story/play", tags=["play"])
-
-
-class SceneTextEdit(BaseModel):
-    """Represent the new text of one scene of the finished play."""
-
-    text: str = Field(min_length=1)
 
 
 @router.get("")

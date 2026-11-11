@@ -1,29 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Request
-from pydantic import BaseModel, Field
 
 from anton.api.dependencies import CharacterServiceDep, StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
+from anton.api.dto.character_dto import CharacterRevision, ReviseRequest
 from anton.application.agents.chat_edit_agent import ChatMessage
-from anton.domain.models import Cast, Character, CharacterDraft, CharacterWithCard
+from anton.domain.models import Cast, CharacterDraft, CharacterWithCard
 
 
 router = APIRouter(prefix="/characters", tags=["characters"])
-
-
-class ReviseRequest(BaseModel):
-    """Represent a chat message about a character together with the character from the user's form."""
-
-    message: str = Field(min_length=1)
-    character: CharacterDraft
-
-
-class CharacterRevision(BaseModel):
-    """Represent the answer of the edit agent and the character as it sees it now."""
-
-    reply: str
-    character: Character
 
 
 @router.post("/generate")

@@ -1,43 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Request
-from pydantic import BaseModel, Field
 
 from anton.api.dependencies import StoryServiceDep
 from anton.api.disconnect import cancel_on_disconnect
+from anton.api.dto.story_dto import ActsReviseRequest, ActsRevision, OutlineReviseRequest, OutlineRevision
 from anton.application.agents.chat_edit_agent import ChatMessage
-from anton.domain.models import ActSummary, DramaticFunction, Outline, StoryBible
+from anton.domain.models import DramaticFunction, Outline, StoryBible
 
 
 router = APIRouter(prefix="/story", tags=["story"])
-
-
-class OutlineReviseRequest(BaseModel):
-    """Represent a chat message about the outline together with the outline from the user's form."""
-
-    message: str = Field(min_length=1)
-    outline: Outline
-
-
-class OutlineRevision(BaseModel):
-    """Represent the answer of the outline agent and the outline as it sees it now."""
-
-    reply: str
-    outline: Outline
-
-
-class ActsReviseRequest(BaseModel):
-    """Represent a chat message about the acts together with the acts from the user's form."""
-
-    message: str = Field(min_length=1)
-    acts: list[ActSummary] = Field(min_length=1)
-
-
-class ActsRevision(BaseModel):
-    """Represent the answer of the acts agent and the acts as it sees them now."""
-
-    reply: str
-    acts: list[ActSummary]
 
 
 @router.get("")

@@ -51,7 +51,7 @@ Full API documentation: http://localhost:8000/docs
 ## Project structure
 
 - `backend/src/anton/`: Python package and application entry point.
-  - `api/`: HTTP layer (routers, DTOs, mappers, exception handlers).
+  - `api/`: HTTP layer (routers, DTOs in `dto/`, exception handlers).
   - `application/`: Business logic services.
   - `domain/`: Domain models, independent of FastAPI and Ollama.
   - `infrastructure/`: External integrations (config, SLM clients, prompts, storage).
