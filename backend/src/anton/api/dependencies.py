@@ -18,6 +18,7 @@ from anton.application.text_service import TextService
 from anton.application.story_service import StoryService
 from anton.domain.models import ActSummary, Character, Outline
 from anton.infrastructure.config import Settings
+from anton.infrastructure.pdf import PdfRenderer, TypstRenderer
 from anton.infrastructure.slm import SLMClient, create_slm_client
 from anton.infrastructure.storage import CastRepository, JsonCastRepository, JsonStoryRepository, StoryRepository
 
@@ -127,12 +128,19 @@ def get_text_service(
 TextServiceDep = Annotated[TextService, Depends(get_text_service)]
 
 
+@lru_cache
+def get_pdf_renderer() -> PdfRenderer:
+    """Create one PDF renderer for the whole application."""
+    return TypstRenderer()
+
+
 def get_play_service(
     story_repository: Annotated[StoryRepository, Depends(get_story_repository)],
     cast_repository: Annotated[CastRepository, Depends(get_cast_repository)],
+    pdf_renderer: Annotated[PdfRenderer, Depends(get_pdf_renderer)],
 ) -> PlayService:
-    """Create the play service with the configured repositories."""
-    return PlayService(story_repository, cast_repository)
+    """Create the play service with the configured repositories and the PDF renderer."""
+    return PlayService(story_repository, cast_repository, pdf_renderer)
 
 
 PlayServiceDep = Annotated[PlayService, Depends(get_play_service)]

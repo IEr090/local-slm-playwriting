@@ -7,7 +7,7 @@ from anton.application.play_service import PlayService
 from anton.domain.models import Cast, CharacterCard, CharacterHistoryEntry, Place, SceneText, StoryBible
 from anton.errors import ActNotFoundError, SceneNotFoundError, StoryOrderError
 from anton.main import app
-from tests.unit.fakes import InMemoryCastRepository, InMemoryStoryRepository
+from tests.unit.fakes import FakePdfRenderer, InMemoryCastRepository, InMemoryStoryRepository
 from tests.unit.test_scene_service import KITCHEN, make_characters, make_scene
 from tests.unit.test_story_models import make_outline
 from tests.unit.test_story_service import make_acts
@@ -43,7 +43,7 @@ def make_service(story: StoryBible | None = None, cast: Cast | None = None):
     """Create the play service with in-memory repositories."""
     story_repository = InMemoryStoryRepository(story if story is not None else make_complete_story())
     cast_repository = InMemoryCastRepository(cast if cast is not None else make_cast())
-    return PlayService(story_repository, cast_repository), story_repository, cast_repository
+    return PlayService(story_repository, cast_repository, FakePdfRenderer()), story_repository, cast_repository
 
 
 class PlayCompleteTest(TestCase):

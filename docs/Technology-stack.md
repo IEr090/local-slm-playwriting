@@ -14,6 +14,8 @@
 | Styling | Tailwind CSS | Flexible styling for a polished interface |
 | UI components | shadcn/ui | Reusable modern interface components |
 | Animations | Motion for React | Transitions, animated cards, panels and workflow feedback |
+| PDF export | Typst (typst Python package) | Typesetting of the finished play into an A4 PDF from a Typst template; the compiler comes with the package, no system dependencies |
+| Typography | Cormorant Garamond + Jost (OFL, bundled) | Same typefaces in the app and in the exported PDF, available offline |
 | Desktop packaging | Tauri | Optional final packaging as a native-like desktop application |
 | Repository | GitHub | Source code, documentation and architecture diagrams |
 | Python dependency management | uv + pyproject.toml + uv.lock | Dependency management and reproducible Python environment |

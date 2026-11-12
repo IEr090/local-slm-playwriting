@@ -40,3 +40,7 @@ class PlaceNotFoundError(NotFoundError):
 
 class StoryOrderError(Exception):
     """Represent a step of the Story Bible that is not possible in the current state, e.g. writing text before all scenes are approved."""
+
+
+class PdfRenderError(Exception):
+    """Represent a play that the PDF renderer could not typeset."""

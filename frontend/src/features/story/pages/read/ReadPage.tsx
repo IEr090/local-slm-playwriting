@@ -4,6 +4,9 @@ import { activeSection, readerSub, TITLE_SECTION } from "@/features/story/model/
 import { paths } from "@/features/story/paths";
 import { isChanged } from "@/features/story/store/play-reader-reducer";
 import { usePlayReader } from "@/features/story/store/use-play-reader";
+import { api } from "@/features/story/api";
+import { useErrors } from "@/shared/errors/errors-context";
+import { downloadBlob } from "@/shared/lib/download";
 import { HeaderPill } from "@/shared/ui/HeaderPill";
 import { ArrowLeft, Lock, Unlock } from "@/shared/ui/icons";
 import { RoundIconButton } from "@/shared/ui/RoundIconButton";
@@ -13,6 +16,8 @@ import { PlayManuscript } from "./PlayManuscript";
 
 /** How far below the top edge of the reading area a section counts as "the one being read". */
 const SPY_MARGIN = 140;
+/** The name of the file when the backend suggests none. */
+const FALLBACK_PDF_NAME = "play.pdf";
 /** Space left above a section the contents scroll to. */
 const SCROLL_GAP = 24;
 
@@ -23,6 +28,8 @@ export function ReadPage() {
   const { play } = state;
   const [unlocked, setUnlocked] = useState(false);
   const [active, setActive] = useState(TITLE_SECTION);
+  const [exporting, setExporting] = useState(false);
+  const { showError } = useErrors();
   const readRef = useRef<HTMLElement>(null);
   const frame = useRef(0);
 
@@ -64,6 +71,20 @@ export function ReadPage() {
     if (unlocked) void flushAll();
     setUnlocked(!unlocked);
   };
+  /** Saves the edits still waiting for their pause, so they are in the PDF, then downloads the PDF. */
+  const exportPdf = async () => {
+    setExporting(true);
+    try {
+      await flushAll();
+      const { blob, fileName } = await api.exportPlayPdf();
+      downloadBlob(blob, fileName ?? FALLBACK_PDF_NAME);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const lockLabel = unlocked ? "Lock the text" : "Unlock the text to edit it";
 
   return (
@@ -74,8 +95,8 @@ export function ReadPage() {
             <ArrowLeft />
             <span>ALL ACTS</span>
           </HeaderPill>
-          <HeaderPill ghost disabled title="PDF export comes later">
-            EXPORT PDF
+          <HeaderPill ghost disabled={!play || exporting} onClick={() => void exportPdf()}>
+            {exporting ? "PREPARING…" : "EXPORT PDF"}
           </HeaderPill>
           <RoundIconButton
             active={unlocked}
