@@ -5,6 +5,7 @@ from anton.api.disconnect import ClientDisconnectedError
 from anton.errors import (
     ActNotFoundError,
     NotFoundError,
+    PdfRenderError,
     PlaceNotFoundError,
     SceneNotFoundError,
     SLMResponseError,
@@ -63,6 +64,14 @@ def add_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=409,
             content={"message": str(error), "detail": type(error).__name__},
+        )
+
+    @app.exception_handler(PdfRenderError)
+    async def pdf_render(request: Request, error: PdfRenderError) -> JSONResponse:
+        """Answer 500 when the PDF of the play could not be typeset."""
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Could not typeset the PDF of the play. Please try again.", "detail": str(error)},
         )
 
     @app.exception_handler(ClientDisconnectedError)

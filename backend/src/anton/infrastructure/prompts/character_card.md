@@ -12,6 +12,8 @@ The user provides the card source fields of one character profile as JSON: `dram
 
 Some fields of the profile may be empty.
 
+After the JSON, a `LANGUAGE` section names the language of the card.
+
 # CARD FIELDS
 
 Fill in the following fields. Field keys are given in backticks.
@@ -23,6 +25,7 @@ Fill in the following fields. Field keys are given in backticks.
 
 # RULES
 
+- Write every card field in the language named in the `LANGUAGE` section, the traits included. Only the field keys stay in English.
 - Use only information from the profile. Do not invent new facts.
 - Keep the meaning of the profile, but rewrite it in your own words. Do not copy phrases from the profile.
 - Never exceed the word limits. Shorten the idea instead of listing details.

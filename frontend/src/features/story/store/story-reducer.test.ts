@@ -6,7 +6,7 @@ const withStory = (patch: Partial<StoryState> = {}): StoryState => ({ ...initial
 
 describe("story reducer", () => {
   it("starts unloaded, without a play, with the chat open", () => {
-    expect(initialState).toMatchObject({ loaded: false, story: null, jobs: [], chatOpen: true });
+    expect(initialState).toMatchObject({ loaded: false, story: null, jobs: [], chatOpen: false });
   });
 
   it("loads the Story Bible, also when there is no play yet", () => {
@@ -16,8 +16,8 @@ describe("story reducer", () => {
   });
 
   it("forgets the old play on reset but keeps the chat panel open or closed", () => {
-    const state = withStory({ chatOpen: false, jobs: ["outline"], chats: { outline: [{ role: "user", text: "hi" }] } });
-    expect(reducer(state, { type: "reset" })).toEqual({ ...initialState, chatOpen: false });
+    const state = withStory({ chatOpen: true, jobs: ["outline"], chats: { outline: [{ role: "user", text: "hi" }] } });
+    expect(reducer(state, { type: "reset" })).toEqual({ ...initialState, chatOpen: true });
   });
 
   it("runs a job once and remembers a failed one until it is started again", () => {
@@ -67,41 +67,41 @@ describe("story reducer", () => {
     expect(state.story?.places).toEqual([]);
   });
 
-  it("sends a message: draft cleared, typing, the predicted targets updating", () => {
-    const state = reducer(withStory({ draft: "Act Two: crueller" }), {
-      type: "messageSent", key: "acts", text: "Act Two: crueller", about: "ACT TWO", pending: ["act:2"],
-    });
-    expect(state).toMatchObject({ draft: "", typing: "acts", pending: ["act:2"] });
-    expect(state.chats.acts).toEqual([{ role: "user", text: "Act Two: crueller", about: "ACT TWO" }]);
+  it("sends a message: draft cleared, typing", () => {
+    const state = reducer(withStory({ draft: "Act Two: crueller" }), { type: "messageSent", key: "acts", text: "Act Two: crueller" });
+    expect(state).toMatchObject({ draft: "", typing: "acts" });
+    expect(state.chats.acts).toEqual([{ role: "user", text: "Act Two: crueller" }]);
   });
 
-  it("takes the answer: typing and updating end, the changes glow", () => {
-    let state = reducer(withStory(), { type: "messageSent", key: "outline", text: "darker", pending: ["outline:tone"] });
+  it("takes the answer: typing ends, the changes glow", () => {
+    let state = reducer(withStory(), { type: "messageSent", key: "outline", text: "darker" });
     state = reducer(state, { type: "replyReceived", key: "outline", text: "Done.", updated: ["Tone / Atmosphere"], highlight: ["outline:tone"] });
-    expect(state).toMatchObject({ typing: null, pending: [], highlight: ["outline:tone"] });
+    expect(state).toMatchObject({ typing: null, highlight: ["outline:tone"] });
     expect(state.chats.outline?.[1]).toEqual({ role: "ai", text: "Done.", updated: ["Tone / Atmosphere"] });
     expect(reducer(state, { type: "clearHighlight" }).highlight).toEqual([]);
   });
 
   it("stops typing when the agent fails", () => {
-    const state = reducer(withStory(), { type: "messageSent", key: "act:1", text: "x", pending: ["scene:1:1"] });
-    expect(reducer(state, { type: "replyFailed", key: "act:1" })).toMatchObject({ typing: null, pending: [] });
+    const state = reducer(withStory(), { type: "messageSent", key: "act:1", text: "x" });
+    expect(reducer(state, { type: "replyFailed", key: "act:1" })).toMatchObject({ typing: null });
   });
 
   it("loads a chat history unless the chat has already started", () => {
     const history = [{ role: "user" as const, text: "old" }];
     expect(reducer(withStory(), { type: "chatLoaded", key: "acts", messages: history }).chats.acts).toEqual(history);
-    const started = reducer(withStory(), { type: "messageSent", key: "acts", text: "new", pending: [] });
+    const started = reducer(withStory(), { type: "messageSent", key: "acts", text: "new" });
     expect(reducer(started, { type: "chatLoaded", key: "acts", messages: history }).chats.acts).toHaveLength(1);
   });
 
   it("clears one chat, e.g. when the act page's chat starts anew", () => {
-    const state = reducer(withStory(), { type: "messageSent", key: "act:1", text: "x", pending: [] });
+    const state = reducer(withStory(), { type: "messageSent", key: "act:1", text: "x" });
     expect(reducer(state, { type: "chatCleared", key: "act:1" }).chats["act:1"]).toBeUndefined();
   });
 
   it("toggles the chat and the scene editor of an act", () => {
-    expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
+    const opened = reducer(initialState, { type: "toggleChat" });
+    expect(opened.chatOpen).toBe(true);
+    expect(reducer(opened, { type: "chatClosed" }).chatOpen).toBe(false);
     let state = reducer(initialState, { type: "setEditingScenes", number: 2, editing: true });
     state = reducer(state, { type: "setEditingScenes", number: 2, editing: true });
     expect(state.editingScenes).toEqual([2]);

@@ -1,12 +1,15 @@
 from unittest import IsolatedAsyncioTestCase
 
+from anton.application.agents.act_chat import ActChat
 from anton.application.agents.acts_target import ActsTarget
 from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.agents.outline_target import OutlineTarget
+from anton.application.agents.scene_targets import SceneBoard
 from anton.application.llm_schemas.act_generation import GeneratedAct, GeneratedActs
 from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.outline_generation import GeneratedOutline
-from anton.application.story_service import OUTLINE_CAST_FIELDS, StoryService
+from anton.application.mappers.cast_mapper import OUTLINE_CAST_FIELDS
+from anton.application.story_service import StoryService
 from anton.domain.models import Act, ActSummary, Cast, Character, StoryBible
 from anton.errors import ActNotFoundError, CastNotFoundError, StoryNotFoundError, StoryOrderError
 from tests.unit.fakes import FakeSLMClient, InMemoryCastRepository, InMemoryStoryRepository, make_draft
@@ -54,7 +57,8 @@ def make_service(
     story_repository = InMemoryStoryRepository(story)
     outline_agent = ChatEditAgent(client, OutlineTarget(), create_checkpointer())
     acts_agent = ChatEditAgent(client, ActsTarget(), create_checkpointer())
-    service = StoryService(story_repository, InMemoryCastRepository(cast), outline_agent, acts_agent)
+    act_chat = ActChat(client, create_checkpointer())
+    service = StoryService(story_repository, InMemoryCastRepository(cast), outline_agent, acts_agent, act_chat)
     return service, client, story_repository, outline_agent
 
 
@@ -79,6 +83,24 @@ class StartPlayTest(IsolatedAsyncioTestCase):
 
         self.assertEqual(await service.outline_history(), [])
         self.assertEqual(await service.acts_history(), [])
+
+    async def test_forgets_act_chats_of_old_play(self) -> None:
+        """Forget the conversation of every act page of the previous play."""
+        client = FakeSLMClient(PROPOSAL)
+        act_chat = ActChat(client, create_checkpointer())
+        story = StoryBible(outline=make_outline(), acts=make_acts())
+        service = StoryService(
+            InMemoryStoryRepository(story),
+            InMemoryCastRepository(),
+            ChatEditAgent(client, OutlineTarget(), create_checkpointer()),
+            ChatEditAgent(client, ActsTarget(), create_checkpointer()),
+            act_chat,
+        )
+        await act_chat.structure.send("act-1", SceneBoard(scenes=[]), "Add a scene.")
+
+        await service.start_play(USER_INPUT)
+
+        self.assertEqual(await act_chat.history(1), [])
 
     async def test_get_story_raises_before_start(self) -> None:
         """Report that no play has been started yet."""

@@ -20,7 +20,7 @@ import { Toast } from "@/shared/ui/Toast";
 import { StoryHeader } from "../StoryHeader";
 import { sceneAnchor } from "./anchors";
 import { Manuscript } from "./Manuscript";
-import { AddingSceneCard, SceneCard } from "./SceneCard";
+import { SceneCard } from "./SceneCard";
 import { ScenePlanCard, type CastChip } from "./ScenePlanCard";
 
 type Actions = ReturnType<typeof useStoryActions>;
@@ -34,7 +34,7 @@ export function ActPage() {
   const state = useStoryState();
   const actions = useStoryActions();
   const { cast } = useCastState();
-  const { loaded, story, jobs, chatOpen, chats, typing, draft, pending, highlight, editingScenes } = state;
+  const { loaded, story, jobs, chatOpen, chats, typing, draft, highlight, editingScenes } = state;
   // structure scenes whose editor is open; a scene added by hand opens with it
   const [open, setOpen] = useState<Set<number>>(new Set());
   const notice = useTimedMessage(NOTICE_MS);
@@ -64,7 +64,6 @@ export function ActPage() {
   const castChips: CastChip[] = cast.map((c) => ({ id: c.id, label: (c.name || c.surname).toUpperCase() }));
   const placeName = (id: string) => story.places.find((p) => p.id === id)?.name ?? "";
   const who = (ids: string[]) => ids.map((id) => names.get(id)).filter((x): x is string => !!x);
-  const isPending = (target: string) => typing === `act:${n}` && pending.includes(target);
 
   // ---------- structure tools ----------
 
@@ -125,7 +124,6 @@ export function ActPage() {
             onChange={(patch) => actions.editStructureScene(n, i, patch)}
             onCreatePlace={actions.createPlace}
             tools={tools(i, act.scenes.length)}
-            updating={isPending(target)}
             highlighted={highlight.includes(target)}
           />
         );
@@ -139,7 +137,6 @@ export function ActPage() {
           who={who(scene.character_ids)}
           whatHappens={scene.what_happens}
           tools={tools(i, act.scenes.length)}
-          updating={isPending(target)}
           highlighted={highlight.includes(target)}
         />
       );
@@ -160,7 +157,6 @@ export function ActPage() {
           whatHappens={scene.what_happens}
           planning={planning}
           dimmed={!planning}
-          updating={isPending(target)}
           onLockedClick={
             waiting && !planning
               ? () => notice.show(`Scene ${no} can be edited only after Scene ${no - 1} is approved.`)
@@ -195,7 +191,6 @@ export function ActPage() {
         }}
         readOnly={stage !== "plans"}
         final={final}
-        updating={isPending(target)}
         highlighted={highlight.includes(target)}
         notice={outdated}
       />
@@ -271,7 +266,6 @@ export function ActPage() {
 
                 {sceneCards}
 
-                {stage === "structure" && isPending(`add:${n}`) && <AddingSceneCard number={act.scenes.length + 1} />}
                 {stage === "structure" && (
                   <button
                     type="button"
@@ -329,7 +323,6 @@ export function ActPage() {
                 approved={stage === "done"}
                 editable={stage === "text"}
                 onEdit={(scene, text) => actions.editSceneText(n, scene, text)}
-                rewriting={act.scene_texts.map((t) => t.scene_number).filter((s) => isPending(`scene:${n}:${s}`))}
                 highlighted={highlight.filter((h) => h.startsWith(`block:${n}:`)).map((h) => h.split(":").slice(2).join(":"))}
               />
             </div>

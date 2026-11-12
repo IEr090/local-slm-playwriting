@@ -47,8 +47,14 @@ class FileCheckpointer(InMemorySaver):
 
     def _save(self) -> None:
         """Write the store to a temporary file first so a crash never leaves a broken file."""
+        storage = {}
+        for thread_id, namespaces in self.storage.items():
+            storage[thread_id] = {}
+            for namespace, items in namespaces.items():
+                storage[thread_id][namespace] = dict(items)
+
         data = {
-            "storage": {thread_id: {ns: dict(items) for ns, items in namespaces.items()} for thread_id, namespaces in self.storage.items()},
+            "storage": storage,
             "writes": {key: dict(value) for key, value in self.writes.items()},
             "blobs": dict(self.blobs),
         }

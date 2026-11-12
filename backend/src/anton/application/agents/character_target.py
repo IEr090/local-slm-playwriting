@@ -24,10 +24,15 @@ class CharacterTarget:
     def parse_changes(self, data: Character, changes: str) -> Character | None:
         """Apply changes written as `field_key: new value` without the model; None if they are not written so."""
         fields = set(Character.model_fields) - NOT_EDITED_FIELDS
-        values = field_values(changes, fields).get("", {}) or quoted_values(changes, fields)
+        values = field_values(changes, fields).get("", {})
+        if not values:
+            values = quoted_values(changes, fields)
         if not values:
             return None
-        patch: dict = {key: value.strip() for key, value in values.items()}
+
+        patch: dict = {}
+        for key, value in values.items():
+            patch[key] = value.strip()
         for key in ("gender", "dramatic_role"):
             if key in patch:
                 patch[key] = patch[key].strip(".").lower() or None

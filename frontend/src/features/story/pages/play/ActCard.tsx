@@ -3,7 +3,6 @@ import { TextField } from "@/shared/ui/fields/TextField";
 import { GenerationVeil } from "@/shared/ui/GenerationVeil";
 import { HeaderPill } from "@/shared/ui/HeaderPill";
 import { ArrowRight } from "@/shared/ui/icons";
-import { UpdatingOverlay } from "@/shared/ui/UpdatingOverlay";
 
 export interface ActCardProps {
   roman: string;
@@ -15,8 +14,6 @@ export interface ActCardProps {
   onSummaryChange?(summary: string): void;
   /** Veil while the act is drafted, staged, written or recorded. */
   veil?: { label: string; line: string } | null;
-  /** "REVISING" while the agent is about to rewrite this act. */
-  revising?: boolean;
   highlighted?: boolean;
   /** Acts after the one being built. */
   dimmed?: boolean;
@@ -36,7 +33,6 @@ export function ActCard({
   summary,
   onSummaryChange,
   veil = null,
-  revising = false,
   highlighted = false,
   dimmed = false,
   open = null,
@@ -82,7 +78,6 @@ export function ActCard({
           </div>
         )}
       </div>
-      <UpdatingOverlay show={revising && !veil} label="REVISING" className="rounded-[10px]" />
       <GenerationVeil show={!!veil} label={veil?.label ?? ""} line={veil?.line ?? ""} />
     </article>
   );

@@ -10,6 +10,7 @@ import type {
   OutlineRevision,
   Place,
   PlaceDraft,
+  Play,
   ScenePlan,
   SceneRevision,
   SceneText,
@@ -17,7 +18,7 @@ import type {
   TextRevision,
 } from "@/features/story/model/types";
 import { ApiError } from "@/shared/api/errors";
-import { getJson, postJson, putJson } from "@/shared/api/http";
+import { getFile, getJson, postJson, putJson } from "@/shared/api/http";
 
 interface CallOptions {
   signal?: AbortSignal;
@@ -109,7 +110,22 @@ const approveText = (n: number, { signal }: CallOptions = {}) =>
 /** One chat for the whole act page: structure, scene plans and text. */
 const getActChat = (n: number) => getJson<HistoryMessage[]>(`${act(n)}/chat`);
 
+// ---------- the whole play ----------
+
+/** The finished play; the backend answers 409 (an ApiError with status 409) while it is not complete. */
+const getPlay = () => getJson<Play>("/api/story/play");
+
+/** Saves the text of one scene of the finished play; answers with the updated play. */
+const savePlayScene = (n: number, no: number, text: string) =>
+  putJson<Play>(`/api/story/play/acts/${n}/scenes/${no}/text`, { text });
+
+/** The finished play as a PDF; the backend answers 409 while it is not complete. */
+const exportPlayPdf = () => getFile("/api/story/play/pdf");
+
 export const api = {
+  getPlay,
+  exportPlayPdf,
+  savePlayScene,
   getStory,
   generateOutline,
   saveOutline,

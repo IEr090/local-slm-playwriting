@@ -103,11 +103,13 @@ class Act(ActSummary):
     @property
     def outdated_plans(self) -> list[int]:
         """Return the numbers of scenes whose plan was written before an earlier scene changed."""
-        return [
-            scene.number
-            for index, scene in enumerate(self.scenes)
-            if scene.plan_built_from is not None and scene.plan_built_from != _plans(self.scenes[:index])
-        ]
+        numbers = []
+        for index, scene in enumerate(self.scenes):
+            if scene.plan_built_from is None:
+                continue
+            if scene.plan_built_from != _plans(self.scenes[:index]):
+                numbers.append(scene.number)
+        return numbers
 
 
 class StoryBible(BaseModel):
@@ -125,6 +127,17 @@ class StoryBible(BaseModel):
     def outline_changed(self) -> bool:
         """Tell whether the outline differs from the one the acts were built from."""
         return self.acts_built_from_outline is not None and self.acts_built_from_outline != self.outline
+
+    @computed_field
+    @property
+    def play_complete(self) -> bool:
+        """Tell whether the acts are approved and the text of every act is approved, so the whole play can be read."""
+        if not self.acts_approved or not self.acts:
+            return False
+        for act in self.acts:
+            if act.status != "text_approved":
+                return False
+        return True
 
 
 def _plans(scenes: list[Scene]) -> list[ScenePlan]:

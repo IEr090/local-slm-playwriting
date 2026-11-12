@@ -1,6 +1,6 @@
 // Small Story Bibles for the tests of the model and the store.
 
-import type { Act, Outline, Scene, StoryBible } from "./types";
+import type { Act, Outline, Play, Scene, StoryBible } from "./types";
 
 export const outline: Outline = {
   title: "The Salt House",
@@ -53,6 +53,30 @@ export function story(patch: Partial<StoryBible> = {}): StoryBible {
     places: [{ id: "kitchen", name: "The keeper's kitchen", description: "", significance: "" }],
     acts_built_from_outline: outline,
     outline_changed: false,
+    play_complete: false,
+    ...patch,
+  };
+}
+
+/** A finished play: two acts with two and one scenes. */
+export function play(patch: Partial<Play> = {}): Play {
+  return {
+    title: "The Salt House",
+    genre: "Drama",
+    premise: "Greed costs you the very thing it tries to keep.",
+    time_and_world: "A North Sea island in 1928.",
+    act_count: 2,
+    cast: [{ character_id: "agnes", name: "AGNES BRANDT", description: "the keeper's housekeeper" }],
+    acts: [
+      {
+        number: 1,
+        scenes: [
+          { number: 1, place_name: "The keeper's kitchen", place_notes: "", text: "(Late afternoon.)\n\nAGNES (at the stove): You came.\n\nELIAS: The last boat." },
+          { number: 2, place_name: "The lamp room", place_notes: "", text: "AGNES: Cut it straight." },
+        ],
+      },
+      { number: 2, scenes: [{ number: 1, place_name: "The jetty", place_notes: "", text: "(Morning.)" }] },
+    ],
     ...patch,
   };
 }

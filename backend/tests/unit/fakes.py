@@ -3,7 +3,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from anton.application.llm_schemas.character_generation import GeneratedCard, GeneratedCast, GeneratedCharacter
-from anton.domain.models import Cast, CharacterDraft, StoryBible
+from anton.domain.models import Cast, CharacterDraft, PlayDocument, StoryBible
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -78,6 +78,20 @@ class FailingSLMClient:
 
     async def close(self) -> None:
         """Do nothing; there is no connection to close."""
+
+class FakePdfRenderer:
+    """Return prepared bytes instead of a PDF and remember the documents it was given."""
+
+    def __init__(self, pdf_bytes: bytes = b"%PDF-fake") -> None:
+        """Initialize the renderer with the bytes it returns."""
+        self.pdf_bytes = pdf_bytes
+        self.documents: list[PlayDocument] = []
+
+    def render(self, document: PlayDocument) -> bytes:
+        """Record the document and return the prepared bytes."""
+        self.documents.append(document)
+        return self.pdf_bytes
+
 
 class InMemoryCastRepository:
     """Keep the cast in memory and count every save."""

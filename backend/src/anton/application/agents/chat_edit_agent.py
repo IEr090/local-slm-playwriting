@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ from anton.infrastructure.prompts import load_prompt
 from anton.infrastructure.slm import SLMClient
 from anton.infrastructure.storage.file_checkpointer import FileCheckpointer
 
+
+logger = logging.getLogger(__name__)
 
 D = TypeVar("D")
 
@@ -54,6 +57,10 @@ class EditTarget(Protocol[D]):
 
     def apply(self, data: D, edited: BaseModel) -> D:
         """Return the data with the model's edit applied."""
+        ...
+
+    def parse_changes(self, data: D, changes: str) -> D | None:
+        """Apply agreed changes written as the chat prompt asks without the model; None if they are not written so."""
         ...
 
 
@@ -108,12 +115,15 @@ def create_checkpointer(path: Path | None = None) -> InMemorySaver:
     With a path the conversations are also written to that file, so they survive a restart of the backend.
     """
     serde = JsonPlusSerializer(allowed_msgpack_modules=STATE_MODELS)
-    return FileCheckpointer(path, serde=serde) if path else InMemorySaver(serde=serde)
+    if path is None:
+        return InMemorySaver(serde=serde)
+    return FileCheckpointer(path, serde=serde)
 
 
 # Short answers that agree to the agent's last proposal, e.g. "yes", "ok, do it", "да, давай".
 AGREEMENT = re.compile(
-    r"^(yes|yeah|yep|ok|okay|sure|agreed|go ahead|do it|apply|please do|fine|ja|да|ага|ок|окей|давай|хорошо|согласен|согласна|применяй)\b",
+    r"^(yes|yeah|yep|ok|okay|sure|agreed|go ahead|do it|apply|please do|fine|ja"
+    r"|да|ага|ок|окей|давай|хорошо|согласен|согласна|применяй)\b",
     re.IGNORECASE,
 )
 # The agent's proposals start like this (the chat prompts ask for "I suggest…"), questions do not.
@@ -126,7 +136,11 @@ NOT_UNDERSTOOD = {
     "Russian": "Что именно нужно изменить? Назовите часть и какой она должна стать.",
     "German": "Was genau soll sich ändern? Nennen Sie den Teil und wie er sein soll.",
 }
-APPLYING = {"English": "Applying the change.", "Russian": "Применяю изменение.", "German": "Ich übernehme die Änderung."}
+APPLYING = {
+    "English": "Applying the change.",
+    "Russian": "Применяю изменение.",
+    "German": "Ich übernehme die Änderung.",
+}
 NOT_APPLIED = {
     "English": "I could not apply this change. Please tell me again exactly what should change.",
     "Russian": "Не получилось применить это изменение. Скажите ещё раз, что именно нужно изменить.",
@@ -148,11 +162,17 @@ def _strings(value: Any) -> list[str]:
     """Collect every string of a JSON-like value, so the language of a text is judged without its keys."""
     if isinstance(value, str):
         return [value]
+
+    items = []
     if isinstance(value, dict):
-        return [text for item in value.values() for text in _strings(item)]
-    if isinstance(value, list):
-        return [text for item in value for text in _strings(item)]
-    return []
+        items = list(value.values())
+    elif isinstance(value, list):
+        items = value
+
+    texts = []
+    for item in items:
+        texts.extend(_strings(item))
+    return texts
 
 
 class ChatEditAgent(Generic[D]):
@@ -174,13 +194,13 @@ class ChatEditAgent(Generic[D]):
         """Start a new conversation by writing the data from its source."""
         async with self._locks[thread_id]:
             await self.checkpointer.adelete_thread(thread_id)
-            result = await self.graph.ainvoke(
-                {"messages": [], "data": None, "source": source, "context": {}, "changes": None, "pending_reply": None},
-                _config(thread_id),
-            )
+            initial_state = _initial_state([], None, source, {})
+            result = await self.graph.ainvoke(initial_state, _config(thread_id))
             return result["data"]
 
-    async def send(self, thread_id: str, data: D, message: str, context: dict[str, Any] | None = None) -> ChatEditResult[D]:
+    async def send(
+        self, thread_id: str, data: D, message: str, context: dict[str, Any] | None = None,
+    ) -> ChatEditResult[D]:
         """Send the user's message with the data from their form and return the agent's answer."""
         context = context or {}
         config = _config(thread_id)
@@ -191,22 +211,18 @@ class ChatEditAgent(Generic[D]):
                 result = await self.graph.ainvoke(Command(resume=answer), config)
             else:
                 # No conversation yet (e.g. after a restart), or the previous run failed before pausing.
-                result = await self.graph.ainvoke(
-                    {
-                        "messages": [HumanMessage(message)], "data": data, "source": {}, "context": context,
-                        "changes": None, "pending_reply": None,
-                    },
-                    config,
-                )
+                initial_state = _initial_state([HumanMessage(message)], data, {}, context)
+                result = await self.graph.ainvoke(initial_state, config)
             return ChatEditResult(reply=result["__interrupt__"][0].value, data=result["data"])
 
     async def history(self, thread_id: str) -> list[ChatMessage]:
         """Return the chat history of the thread, or an empty list if there is none."""
         state = await self.graph.aget_state(_config(thread_id))
-        return [
-            ChatMessage(role="user" if isinstance(message, HumanMessage) else "assistant", content=message.content)
-            for message in state.values.get("messages", [])
-        ]
+        history = []
+        for message in state.values.get("messages", []):
+            role = "user" if isinstance(message, HumanMessage) else "assistant"
+            history.append(ChatMessage(role=role, content=message.content))
+        return history
 
     async def forget(self, thread_id: str) -> None:
         """Forget the conversation of the thread, e.g. when a new play is started."""
@@ -246,43 +262,77 @@ class ChatEditAgent(Generic[D]):
         """Let the model answer the user and say whether changes were agreed."""
         # The last message is kept apart from the history, so a small model answers it instead of continuing the list.
         *history, last = state["messages"]
-        view = self.target.view(state["data"])
         reply_language = _reply_language(state["messages"])
-        user_prompt = json.dumps(
+
+        user_prompt = self._chat_prompt(state, history, last, reply_language)
+        turn = await self._turn_without_echo(user_prompt, last.content, reply_language)
+        turn = await self._turn_in_language(user_prompt, turn, reply_language)
+
+        changes = (turn.apply_changes or "").strip()
+        if changes:
+            return {"changes": changes, "pending_reply": turn.reply}
+
+        agreed_proposal = _agreed_proposal(history, last)
+        if agreed_proposal:
+            # The playwright said yes but a small model asked again: apply the proposal they agreed to.
+            reply = turn.reply
+            if reply.rstrip().endswith("?"):
+                reply = APPLYING[reply_language]
+            return {"changes": agreed_proposal, "pending_reply": reply}
+        return {"messages": [AIMessage(turn.reply)], "changes": None, "pending_reply": None}
+
+    def _chat_prompt(
+        self, state: ChatEditState, history: list[AnyMessage], last: AnyMessage, reply_language: str,
+    ) -> str:
+        """Write the input of the chat turn: the data, the context, the earlier messages and the last message."""
+        view = self.target.view(state["data"])
+
+        earlier_messages = []
+        for message in history:
+            earlier_messages.append({"speaker": _speaker_of(message), "text": message.content})
+
+        text_language = language_of(" ".join(_strings(view))) or "English"
+        return json.dumps(
             {
                 **state["context"],
                 self.target.name: view,
-                "history": [
-                    {"speaker": "playwright" if isinstance(message, HumanMessage) else "dramaturg", "text": message.content}
-                    for message in history
-                ],
+                "history": earlier_messages,
                 "playwright_message": last.content,
                 # Named in the input, because a small model follows the language of its examples otherwise.
                 "reply_language": reply_language,
-                "text_language": language_of(" ".join(_strings(view))) or "English",
+                "text_language": text_language,
             },
             ensure_ascii=False,
         )
+
+    async def _turn_without_echo(self, user_prompt: str, last_text: str, reply_language: str) -> ChatTurn:
+        """Ask for a chat answer; if the model only repeats the user's message, try once more and then give up."""
         turn = await self._turn(user_prompt)
-        if _same_text(turn.reply, last.content):
-            # A small model sometimes repeats the message instead of answering it: one more try with a hint.
-            turn = await self._turn(f"{user_prompt}\n\nYour last reply only repeated the playwright's message. Answer it instead.")
-            if _same_text(turn.reply, last.content):
-                turn = ChatTurn(reply=NOT_UNDERSTOOD[reply_language], apply_changes=None)
-        if not _in_language(turn.reply, reply_language):
-            # A small model often answers in the language of the outline; one more try with the language named.
-            retried = await self._turn(f"{user_prompt}\n\nWrite `reply` in {reply_language}; only quoted new values stay in the text language.")
-            if _in_language(retried.reply, reply_language):
-                turn = retried
-        changes = (turn.apply_changes or "").strip() or None
-        proposal = history[-1].content if history and isinstance(history[-1], AIMessage) else ""
-        if not changes and is_proposal(proposal) and is_agreement(last.content):
-            # The playwright said yes but a small model asked again: apply the proposal they agreed to.
-            reply = turn.reply if not turn.reply.rstrip().endswith("?") else APPLYING[reply_language]
-            return {"changes": proposal, "pending_reply": reply}
-        if changes:
-            return {"changes": changes, "pending_reply": turn.reply}
-        return {"messages": [AIMessage(turn.reply)], "changes": None, "pending_reply": None}
+        if not _same_text(turn.reply, last_text):
+            return turn
+
+        # A small model sometimes repeats the message instead of answering it: one more try with a hint.
+        logger.info("Retrying chat turn reason=echo")
+        hint = "Your last reply only repeated the playwright's message. Answer it instead."
+        turn = await self._turn(f"{user_prompt}\n\n{hint}")
+        if not _same_text(turn.reply, last_text):
+            return turn
+
+        logger.info("Chat turn still echoes, asking the user to say again")
+        return ChatTurn(reply=NOT_UNDERSTOOD[reply_language], apply_changes=None)
+
+    async def _turn_in_language(self, user_prompt: str, turn: ChatTurn, reply_language: str) -> ChatTurn:
+        """Return the turn if its reply is in the user's language, else try once more with the language named."""
+        if _in_language(turn.reply, reply_language):
+            return turn
+
+        # A small model often answers in the language of the outline; one more try with the language named.
+        logger.info("Retrying chat turn reason=wrong_language reply_language=%s", reply_language)
+        hint = f"Write `reply` in {reply_language}; only quoted new values stay in the text language."
+        retried = await self._turn(f"{user_prompt}\n\n{hint}")
+        if _in_language(retried.reply, reply_language):
+            return retried
+        return turn
 
     async def _turn(self, user_prompt: str) -> ChatTurn:
         """Ask the model for one chat answer."""
@@ -298,17 +348,15 @@ class ChatEditAgent(Generic[D]):
         return "edit" if state["changes"] else "wait_user"
 
     async def _edit(self, state: ChatEditState) -> dict:
-        """Apply the agreed changes to the data: directly when they are written as the prompt asks, else by the model."""
-        parse = getattr(self.target, "parse_changes", None)
-        # the proposal the playwright agreed to states the new values too
-        proposal = next((m.content for m in reversed(state["messages"]) if isinstance(m, AIMessage)), "")
-        direct = None
-        for text in (state["changes"], proposal) if parse else ():
-            direct = parse(state["data"], text)
-            if direct is not None and direct != state["data"]:
-                break
-        if direct is not None and direct != state["data"]:
-            return {"data": direct, "changes": None, "pending_reply": None, "messages": [AIMessage(state["pending_reply"])]}
+        """Apply the agreed changes: directly when they are written as the prompt asks, else by the model."""
+        proposal = _last_proposal(state["messages"])
+        direct_data = self._parse_directly(state, proposal)
+        if direct_data is not None:
+            return {
+                "data": direct_data, "changes": None, "pending_reply": None,
+                "messages": [AIMessage(state["pending_reply"])],
+            }
+
         edited = await self.client.generate(
             system_prompt=load_prompt(self.target.edit_prompt),
             user_prompt=json.dumps(
@@ -319,15 +367,62 @@ class ChatEditAgent(Generic[D]):
             think=False,
         )
         data = self.target.apply(state["data"], edited)
+
         # The reply says the change is applied, which is not true when the edit changed nothing.
-        reply = state["pending_reply"] if data != state["data"] else NOT_APPLIED[_reply_language(state["messages"])]
+        if data != state["data"]:
+            reply = state["pending_reply"]
+        else:
+            logger.info("Edit changed nothing target=%s", self.target.name)
+            reply = NOT_APPLIED[_reply_language(state["messages"])]
         return {"data": data, "changes": None, "pending_reply": None, "messages": [AIMessage(reply)]}
+
+    def _parse_directly(self, state: ChatEditState, proposal: str) -> D | None:
+        """Return the data changed without the model, or None if neither the changes nor the proposal say how."""
+        # The proposal the playwright agreed to states the new values too.
+        for text in (state["changes"], proposal):
+            parsed = self.target.parse_changes(state["data"], text)
+            if parsed is not None and parsed != state["data"]:
+                return parsed
+        return None
 
     def _wait_user(self, state: ChatEditState) -> dict:
         """Pause until the user answers, then take their message and the data and context from their form."""
         # Right after the data is written there is no answer to show yet.
         answer = interrupt(state["messages"][-1].content if state["messages"] else "")
         return {"messages": [HumanMessage(answer["message"])], "data": answer["data"], "context": answer["context"]}
+
+
+def _initial_state(messages: list[AnyMessage], data: Any, source: dict[str, str], context: dict[str, Any]) -> dict:
+    """Return the state a run of the graph starts from."""
+    return {
+        "messages": messages, "data": data, "source": source, "context": context,
+        "changes": None, "pending_reply": None,
+    }
+
+
+def _speaker_of(message: AnyMessage) -> str:
+    """Name the speaker of a message as the chat prompts call them."""
+    if isinstance(message, HumanMessage):
+        return "playwright"
+    return "dramaturg"
+
+
+def _agreed_proposal(history: list[AnyMessage], last: AnyMessage) -> str:
+    """Return the agent's last message if it proposed a change and the user's last message agrees to it, else ''."""
+    if not history or not isinstance(history[-1], AIMessage):
+        return ""
+    proposal = history[-1].content
+    if is_proposal(proposal) and is_agreement(last.content):
+        return proposal
+    return ""
+
+
+def _last_proposal(messages: list[AnyMessage]) -> str:
+    """Return the text of the agent's latest message, or '' if the agent has not written yet."""
+    for message in reversed(messages):
+        if isinstance(message, AIMessage):
+            return message.content
+    return ""
 
 
 def _in_language(reply: str, language: str) -> bool:
@@ -339,13 +434,21 @@ def _in_language(reply: str, language: str) -> bool:
 
 def _same_text(a: str, b: str) -> bool:
     """Tell whether two messages are the same apart from case, spaces and punctuation."""
-    return re.sub(r"[\W_]+", " ", a).strip().casefold() == re.sub(r"[\W_]+", " ", b).strip().casefold()
+    return _bare_text(a) == _bare_text(b)
+
+
+def _bare_text(text: str) -> str:
+    """Remove case, repeated spaces and punctuation from a message."""
+    return re.sub(r"[\W_]+", " ", text).strip().casefold()
 
 
 def _reply_language(messages: list[AnyMessage]) -> str:
     """Return the language of the playwright's latest message that is long enough to tell, English by default."""
     for message in reversed(messages):
-        if isinstance(message, HumanMessage) and (language := language_of(message.content)):
+        if not isinstance(message, HumanMessage):
+            continue
+        language = language_of(message.content)
+        if language is not None:
             return language
     return "English"
 

@@ -4,8 +4,10 @@ from anton.domain.models import Outline
 
 def to_outline(generated: GeneratedOutline) -> Outline:
     """Turn the generated outline into the outline of the Story Bible, trimming stray spaces."""
-    return Outline(**{
-        field: value.strip() if isinstance(value, str) else value
-        for field, value in generated.model_dump().items()
-    })
+    values = {}
+    for field, value in generated.model_dump().items():
+        if isinstance(value, str):
+            value = value.strip()
+        values[field] = value
+    return Outline(**values)
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { ACT_STATUS_LABEL, actName, firstClause, genreLabel, numberWord, roman } from "@/features/story/model/labels";
 import { canOpenAct, currentAct, isOpenAct } from "@/features/story/model/progress";
 import type { Act, OutlineField, StoryBible } from "@/features/story/model/types";
+import { paths } from "@/features/story/paths";
 import { useStoryActions, useStoryState } from "@/features/story/store/story-context";
 import type { StoryState } from "@/features/story/store/story-reducer";
 import { useTimedMessage } from "@/shared/hooks/use-timed-message";
@@ -16,6 +17,7 @@ import { Notice } from "@/shared/ui/Notice";
 import { Toast } from "@/shared/ui/Toast";
 import { StoryHeader } from "../StoryHeader";
 import { ActCard, type ActCardProps } from "./ActCard";
+import { FinaleCard } from "./FinaleCard";
 import { OutlineEditor } from "./OutlineEditor";
 import { OutlineSummary } from "./OutlineSummary";
 
@@ -80,7 +82,6 @@ export function PlayPage() {
   }
 
   const header = playHeader(state, story, showActs, actions);
-  const outlinePending = fieldsOf(state.pending, "outline:");
   const outlineHighlight = fieldsOf(state.highlight, "outline:");
 
   return (
@@ -116,7 +117,6 @@ export function PlayPage() {
                     outline={story.outline}
                     readOnly={showActs}
                     onChange={actions.editOutline}
-                    updating={typing === "outline" ? outlinePending : []}
                     highlighted={outlineHighlight}
                   />
                 </motion.div>
@@ -153,6 +153,14 @@ export function PlayPage() {
                         <ActCard {...actCardProps(state, story, act, actions, notice.show)} />
                       </div>
                     ))}
+                {story.play_complete && (
+                  <FinaleCard
+                    title={story.outline?.title || "Untitled play"}
+                    acts={story.acts.length}
+                    scenes={story.acts.reduce((sum, act) => sum + act.scenes.length, 0)}
+                    onRead={() => navigate(paths.read)}
+                  />
+                )}
               </div>
             </div>
           </section>
@@ -248,7 +256,7 @@ function playHeader(state: StoryState, story: StoryBible, showActs: boolean, act
 
 /** What one act card shows, from the Story Bible and the running requests. */
 function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: Actions, showNotice: (message: string) => void): ActCardProps {
-  const { jobs, failed, pending, highlight, typing } = state;
+  const { jobs, failed, highlight } = state;
   const n = act.number;
   const name = actName(n);
   const word = numberWord(n).toUpperCase();
@@ -273,7 +281,6 @@ function actCardProps(state: StoryState, story: StoryBible, act: Act, actions: A
     // the summaries are final once the acts are approved
     onSummaryChange: veil || story.acts_approved ? undefined : (summary) => actions.editActSummary(n, summary),
     veil,
-    revising: typing === "acts" && pending.includes(`act:${n}`),
     highlighted: highlight.includes(`act:${n}`),
     dimmed: story.acts_approved && !!current && n > current.number,
     open: openable ? { label: read ? "READ" : "OPEN", aria: `${read ? "Read" : "Open"} ${name}`, onOpen: () => actions.openAct(n) } : null,

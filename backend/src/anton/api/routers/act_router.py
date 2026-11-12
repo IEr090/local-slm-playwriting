@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
 
 from anton.api.dependencies import SceneServiceDep, TextServiceDep
 from anton.api.disconnect import cancel_on_disconnect
+from anton.api.dto.act_dto import ScenesReviseRequest, TextReviseRequest
 from anton.application.agents.chat_edit_agent import ChatMessage
 from anton.application.scene_service import SceneRevision
 from anton.application.text_service import TextRevision
@@ -10,20 +10,6 @@ from anton.domain.models import Place, PlaceDraft, ScenePlan, SceneText, StoryBi
 
 
 router = APIRouter(prefix="/story", tags=["acts"])
-
-
-class ScenesReviseRequest(BaseModel):
-    """Represent a chat message on the act page together with the scenes from the user's form."""
-
-    message: str = Field(min_length=1)
-    scenes: list[ScenePlan] = Field(min_length=1)
-
-
-class TextReviseRequest(BaseModel):
-    """Represent a chat message about the text of the act together with the scene texts from the user's form."""
-
-    message: str = Field(min_length=1)
-    scene_texts: list[SceneText] = Field(min_length=1)
 
 
 @router.get("/places")

@@ -8,16 +8,22 @@ def to_scene_views(scenes: list[ScenePlan], places: list[Place], characters: lis
     """Replace the ids of places and characters with their names, so a small model can read and copy them."""
     place_names = {place.id: place.name for place in places}
     character_names = {character.id: full_name(character) for character in characters}
-    return [
-        SceneView(
+
+    views = []
+    for number, scene in enumerate(scenes, start=1):
+        names = []
+        for character_id in scene.character_ids:
+            if character_id in character_names:
+                names.append(character_names[character_id])
+
+        views.append(SceneView(
             number=number,
             place=place_names.get(scene.place_id, ""),
             place_notes=scene.place_notes,
-            characters=[character_names[character_id] for character_id in scene.character_ids if character_id in character_names],
+            characters=names,
             what_happens=scene.what_happens,
-        )
-        for number, scene in enumerate(scenes, start=1)
-    ]
+        ))
+    return views
 
 
 def add_new_places(board: SceneBoard, places: list[Place]) -> list[Place]:
@@ -44,19 +50,22 @@ def add_new_places(board: SceneBoard, places: list[Place]) -> list[Place]:
 def to_scene_plans(views: list[SceneView], places: list[Place], characters: list[Character]) -> list[ScenePlan]:
     """Replace the names the model wrote with ids; unknown characters are dropped, unknown places stay empty."""
     place_ids = {_normalize(place.name): place.id for place in places}
-    return [
-        ScenePlan(
+
+    plans = []
+    for view in views:
+        character_ids = []
+        for name in view.characters:
+            character_id = find_character(name, characters)
+            if character_id:
+                character_ids.append(character_id)
+
+        plans.append(ScenePlan(
             place_id=place_ids.get(_normalize(view.place), ""),
             place_notes=view.place_notes,
-            character_ids=_unique([
-                character_id
-                for name in view.characters
-                if (character_id := find_character(name, characters))
-            ]),
+            character_ids=_unique(character_ids),
             what_happens=view.what_happens,
-        )
-        for view in views
-    ]
+        ))
+    return plans
 
 
 def to_scenes(plans: list[ScenePlan]) -> list[Scene]:

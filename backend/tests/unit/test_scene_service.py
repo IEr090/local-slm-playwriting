@@ -1,8 +1,8 @@
 import json
 from unittest import IsolatedAsyncioTestCase
 
-from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
-from anton.application.agents.scene_targets import ScenesTarget, StructureTarget
+from anton.application.agents.act_chat import ActChat
+from anton.application.agents.chat_edit_agent import create_checkpointer
 from anton.application.llm_schemas.chat_turn import ChatTurn
 from anton.application.llm_schemas.scene_generation import (
     EditedScene,
@@ -69,14 +69,7 @@ def make_service(*responses, story: StoryBible | None = None, cast: Cast | None 
     client = FakeSLMClient(*responses)
     repository = InMemoryStoryRepository(story if story is not None else make_story())
     cast_repository = InMemoryCastRepository(cast or Cast(characters=make_characters(), cards={}))
-    checkpointer = create_checkpointer()
-    service = SceneService(
-        repository,
-        cast_repository,
-        ChatEditAgent(client, StructureTarget(), checkpointer),
-        ChatEditAgent(client, ScenesTarget(), checkpointer),
-        ScenePlanner(client),
-    )
+    service = SceneService(repository, cast_repository, ActChat(client, create_checkpointer()), ScenePlanner(client))
     return service, client, repository
 
 
@@ -502,12 +495,3 @@ class PlacesAndChatsTest(IsolatedAsyncioTestCase):
         self.assertTrue(place.id)
         self.assertEqual(service.get_places(), [KITCHEN, place])
         self.assertEqual(repository.load().places, [KITCHEN, place])
-
-    async def test_forgets_act_chats(self) -> None:
-        """Forget the conversation of every act page."""
-        service, *_ = make_service(PROPOSAL, story=make_story(make_scene(1)))
-        await service.revise_structure(1, plans(make_scene(1)), "Add a scene.")
-
-        await service.forget_act_chats()
-
-        self.assertEqual(await service.act_chat(1), [])

@@ -1,6 +1,7 @@
 // Requests to the backend. In dev, Vite forwards /api to it (see vite.config.ts).
 // Every failure becomes an ApiError for the error banner; a cancelled request stays an AbortError.
 
+import { fileNameFromDisposition } from "./content-disposition";
 import { ApiError } from "./errors";
 
 interface RequestOptions {
@@ -22,7 +23,26 @@ export function putJson<T>(url: string, body: unknown, options: RequestOptions =
   return requestJson<T>("PUT", url, body, options);
 }
 
-async function requestJson<T>(method: string, url: string, body: unknown, { signal }: RequestOptions): Promise<T> {
+/** A file the backend sent: its bytes and the name it suggests (null when it suggests none). */
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string | null;
+}
+
+/** Downloads the file at `url`; its name is taken from the Content-Disposition header. */
+export async function getFile(url: string, options: RequestOptions = {}): Promise<DownloadedFile> {
+  const response = await send("GET", url, undefined, options);
+  const blob = await response.blob();
+  return { blob, fileName: fileNameFromDisposition(response.headers.get("Content-Disposition")) };
+}
+
+async function requestJson<T>(method: string, url: string, body: unknown, options: RequestOptions): Promise<T> {
+  const response = await send(method, url, body, options);
+  return (await response.json()) as T;
+}
+
+/** Sends the request; a network failure or a non-2xx answer becomes an ApiError. */
+async function send(method: string, url: string, body: unknown, { signal }: RequestOptions): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(url, {
@@ -37,7 +57,7 @@ async function requestJson<T>(method: string, url: string, body: unknown, { sign
   }
 
   if (!response.ok) throw await toApiError(response);
-  return (await response.json()) as T;
+  return response;
 }
 
 /**

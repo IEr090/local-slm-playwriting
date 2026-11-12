@@ -2,10 +2,17 @@ import json
 from unittest import IsolatedAsyncioTestCase
 from uuid import UUID
 
+from anton.application.agents.character_target import CharacterTarget
+from anton.application.agents.chat_edit_agent import ChatEditAgent, create_checkpointer
 from anton.application.character_service import CARD_SOURCE_FIELDS, CharacterService
 from anton.errors import CastNotFoundError, CharacterNotFoundError
 from anton.domain.models import Cast, Character, CharacterCard, CharacterHistoryEntry
 from tests.unit.fakes import CARD, FakeSLMClient, InMemoryCastRepository, make_draft, make_generated_cast
+
+
+def make_edit_agent() -> ChatEditAgent[Character]:
+    """Create the edit agent of characters with a fake model client; the tests here never chat."""
+    return ChatEditAgent(FakeSLMClient(), CharacterTarget(), create_checkpointer())
 
 
 OLD_CARD = CharacterCard(role_label="protagonist", tagline="Old tagline", traits=["A", "B", "C"], wants="Old.", fears="Old.")
@@ -25,7 +32,7 @@ class CreateCharacterTest(IsolatedAsyncioTestCase):
         """Create the service with a fake model client and an empty repository."""
         self.client = FakeSLMClient(CARD)
         self.repository = InMemoryCastRepository()
-        self.service = CharacterService(self.client, self.repository)
+        self.service = CharacterService(self.client, self.repository, make_edit_agent())
         self.draft = make_draft()
 
     async def test_gives_new_character_an_id(self) -> None:
@@ -47,8 +54,28 @@ class CreateCharacterTest(IsolatedAsyncioTestCase):
         """Pass only the card source fields to the card prompt."""
         await self.service.create_character(self.draft)
 
-        prompt = json.loads(self.client.calls[0]["user_prompt"])
-        self.assertEqual(set(prompt), CARD_SOURCE_FIELDS)
+        profile = self.client.calls[0]["user_prompt"].split("\n\n# LANGUAGE")[0]
+        self.assertEqual(set(json.loads(profile)), CARD_SOURCE_FIELDS)
+
+    async def test_asks_for_card_in_profile_language(self) -> None:
+        """Name the language of the profile's text, so a Russian profile gets a Russian card."""
+        russian = make_draft().model_copy(update={
+            "occupation_social_role": "Нотариус",
+            "personality": "Скрытный и расчётливый",
+            "goal": "Получить наследство",
+            "motivation": "Долги",
+            "fear_weakness": "Боится разоблачения",
+        })
+
+        await self.service.create_character(russian)
+
+        self.assertIn("Write every card field in Russian.", self.client.calls[0]["user_prompt"])
+
+    async def test_asks_for_english_card_for_english_profile(self) -> None:
+        """Keep English for an English profile."""
+        await self.service.create_character(self.draft)
+
+        self.assertIn("Write every card field in English.", self.client.calls[0]["user_prompt"])
 
     async def test_adds_character_to_saved_cast(self) -> None:
         """Save the new character and its card in the cast."""
@@ -65,7 +92,7 @@ class GenerateCastTest(IsolatedAsyncioTestCase):
     async def test_saves_generated_cast(self) -> None:
         """Save the generated cast in the repository."""
         repository = InMemoryCastRepository()
-        service = CharacterService(FakeSLMClient(make_generated_cast(), CARD), repository)
+        service = CharacterService(FakeSLMClient(make_generated_cast(), CARD), repository, make_edit_agent())
 
         cast = await service.generate_cast("A theatre in Vienna.")
 
@@ -78,7 +105,7 @@ class GetCastTest(IsolatedAsyncioTestCase):
 
     async def test_raises_without_saved_cast(self) -> None:
         """Report that no cast has been generated yet."""
-        service = CharacterService(FakeSLMClient(CARD), InMemoryCastRepository())
+        service = CharacterService(FakeSLMClient(CARD), InMemoryCastRepository(), make_edit_agent())
 
         with self.assertRaises(CastNotFoundError):
             service.get_cast()
@@ -91,7 +118,7 @@ class EditCharacterTest(IsolatedAsyncioTestCase):
         """Create the service with a fake model client and a saved cast of two characters."""
         self.client = FakeSLMClient(CARD)
         self.repository = InMemoryCastRepository(make_cast())
-        self.service = CharacterService(self.client, self.repository)
+        self.service = CharacterService(self.client, self.repository, make_edit_agent())
 
     async def test_replaces_only_edited_character(self) -> None:
         """Keep the id, the order and the other character unchanged."""

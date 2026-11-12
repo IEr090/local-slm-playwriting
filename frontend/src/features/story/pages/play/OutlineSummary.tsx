@@ -1,13 +1,14 @@
 import { genreLabel } from "@/features/story/model/labels";
 import type { Outline } from "@/features/story/model/types";
 
-/** The approved outline, collapsed into the left column next to the acts; it is final and read-only. */
+/** The approved outline, collapsed into the left column next to the acts; it is final and read-only.
+ * Every field is shown in full; the column scrolls. */
 export function OutlineSummary({ outline: o }: { outline: Outline }) {
-  const rows: [string, string, string][] = [
-    ["TONE", o.tone, "line-clamp-4"],
-    ["TIME & WORLD", o.time_and_world, "line-clamp-4"],
-    ["CONFLICT", o.central_conflict, "line-clamp-4"],
-    ["SYNOPSIS", o.synopsis, "line-clamp-7"],
+  const rows: [string, string][] = [
+    ["TONE", o.tone],
+    ["TIME & WORLD", o.time_and_world],
+    ["CONFLICT", o.central_conflict],
+    ["SYNOPSIS", o.synopsis],
   ];
   return (
     <>
@@ -16,8 +17,8 @@ export function OutlineSummary({ outline: o }: { outline: Outline }) {
       <div className="mt-[10px] font-serif text-[19px] leading-[1.3] text-gold-soft italic">{o.premise}</div>
       <div className="dotted-rule mt-5 mb-4" />
       <SummaryRow label="GENRE">{genreLabel(o.genre)}</SummaryRow>
-      {rows.map(([label, value, clamp]) => (
-        <SummaryRow key={label} label={label} className={clamp}>
+      {rows.map(([label, value]) => (
+        <SummaryRow key={label} label={label}>
           {value}
         </SummaryRow>
       ))}
@@ -25,11 +26,11 @@ export function OutlineSummary({ outline: o }: { outline: Outline }) {
   );
 }
 
-function SummaryRow({ label, className, children }: { label: string; className?: string; children: string }) {
+function SummaryRow({ label, children }: { label: string; children: string }) {
   return (
     <div className="mb-[14px] flex flex-col gap-1">
       <span className="font-sans text-[10px] tracking-[1.5px] text-muted-2">{label}</span>
-      <span className={`font-sans text-[13px] leading-[1.5] text-ink-3 ${className ?? ""}`}>{children}</span>
+      <span className="font-sans text-[13px] leading-[1.5] text-ink-3">{children}</span>
     </div>
   );
 }
