@@ -54,8 +54,28 @@ class CreateCharacterTest(IsolatedAsyncioTestCase):
         """Pass only the card source fields to the card prompt."""
         await self.service.create_character(self.draft)
 
-        prompt = json.loads(self.client.calls[0]["user_prompt"])
-        self.assertEqual(set(prompt), CARD_SOURCE_FIELDS)
+        profile = self.client.calls[0]["user_prompt"].split("\n\n# LANGUAGE")[0]
+        self.assertEqual(set(json.loads(profile)), CARD_SOURCE_FIELDS)
+
+    async def test_asks_for_card_in_profile_language(self) -> None:
+        """Name the language of the profile's text, so a Russian profile gets a Russian card."""
+        russian = make_draft().model_copy(update={
+            "occupation_social_role": "Нотариус",
+            "personality": "Скрытный и расчётливый",
+            "goal": "Получить наследство",
+            "motivation": "Долги",
+            "fear_weakness": "Боится разоблачения",
+        })
+
+        await self.service.create_character(russian)
+
+        self.assertIn("Write every card field in Russian.", self.client.calls[0]["user_prompt"])
+
+    async def test_asks_for_english_card_for_english_profile(self) -> None:
+        """Keep English for an English profile."""
+        await self.service.create_character(self.draft)
+
+        self.assertIn("Write every card field in English.", self.client.calls[0]["user_prompt"])
 
     async def test_adds_character_to_saved_cast(self) -> None:
         """Save the new character and its card in the cast."""

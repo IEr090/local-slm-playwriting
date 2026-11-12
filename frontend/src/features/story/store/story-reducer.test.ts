@@ -6,7 +6,7 @@ const withStory = (patch: Partial<StoryState> = {}): StoryState => ({ ...initial
 
 describe("story reducer", () => {
   it("starts unloaded, without a play, with the chat open", () => {
-    expect(initialState).toMatchObject({ loaded: false, story: null, jobs: [], chatOpen: true });
+    expect(initialState).toMatchObject({ loaded: false, story: null, jobs: [], chatOpen: false });
   });
 
   it("loads the Story Bible, also when there is no play yet", () => {
@@ -16,8 +16,8 @@ describe("story reducer", () => {
   });
 
   it("forgets the old play on reset but keeps the chat panel open or closed", () => {
-    const state = withStory({ chatOpen: false, jobs: ["outline"], chats: { outline: [{ role: "user", text: "hi" }] } });
-    expect(reducer(state, { type: "reset" })).toEqual({ ...initialState, chatOpen: false });
+    const state = withStory({ chatOpen: true, jobs: ["outline"], chats: { outline: [{ role: "user", text: "hi" }] } });
+    expect(reducer(state, { type: "reset" })).toEqual({ ...initialState, chatOpen: true });
   });
 
   it("runs a job once and remembers a failed one until it is started again", () => {
@@ -99,7 +99,9 @@ describe("story reducer", () => {
   });
 
   it("toggles the chat and the scene editor of an act", () => {
-    expect(reducer(initialState, { type: "toggleChat" }).chatOpen).toBe(false);
+    const opened = reducer(initialState, { type: "toggleChat" });
+    expect(opened.chatOpen).toBe(true);
+    expect(reducer(opened, { type: "chatClosed" }).chatOpen).toBe(false);
     let state = reducer(initialState, { type: "setEditingScenes", number: 2, editing: true });
     state = reducer(state, { type: "setEditingScenes", number: 2, editing: true });
     expect(state.editingScenes).toEqual([2]);

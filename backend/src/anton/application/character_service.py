@@ -117,14 +117,28 @@ class CharacterService:
         return await self.edit_agent.history(character_id)
 
     async def _generate_card(self, character: Character) -> CharacterCard:
-        """Generate the grid card from a character profile."""
+        """Generate the grid card from a character profile, in the language the profile is written in."""
+        profile = character.model_dump_json(include=CARD_SOURCE_FIELDS)
+        language = _profile_language(character)
         generated = await self.client.generate(
             system_prompt=load_prompt("character_card.md"),
-            user_prompt=character.model_dump_json(include=CARD_SOURCE_FIELDS),
+            user_prompt=f"{profile}\n\n# LANGUAGE\n\nWrite every card field in {language}.",
             response_model=GeneratedCard,
             think=False,
         )
         return CharacterCard(role_label=character.dramatic_role, **generated.model_dump())
+
+
+def _profile_language(character: Character) -> str:
+    """Return the language of the profile's free text; `dramatic_role` is a fixed English value and is left out."""
+    texts = [
+        character.occupation_social_role,
+        character.personality,
+        character.goal,
+        character.motivation,
+        character.fear_weakness,
+    ]
+    return play_language(" ".join(texts))
 
 
 def _find(cast: Cast, character_id: str) -> Character:

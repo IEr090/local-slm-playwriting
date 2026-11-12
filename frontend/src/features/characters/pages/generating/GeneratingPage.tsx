@@ -21,9 +21,10 @@ export function GeneratingPage() {
 
 /** Background layers over the whole window; the animation on a fixed 1280×800 stage, centred. */
 function GenerationStage() {
-  const { premise, generation, cast } = useCastState();
+  const { premise, generation, cast, loaded } = useCastState();
   const { cancelGeneration, finishGeneration } = useCastActions();
-  const ready = generation === "ready";
+  // after a reload in the result phase the saved cast is read first
+  const ready = generation === "ready" && loaded;
   const { phase, words, names, status } = useGeneration({
     premise,
     ready,

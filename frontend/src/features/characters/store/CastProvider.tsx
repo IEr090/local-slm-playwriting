@@ -10,16 +10,29 @@ import { changedFields } from "@/features/characters/model/validation";
 import { paths } from "@/features/characters/paths";
 import { isAbort } from "@/shared/api/errors";
 import { useErrors } from "@/shared/errors/errors-context";
+import { useUnloading } from "@/shared/hooks/use-unloading";
 import { ActionsContext, StateContext, type CastActions } from "./cast-context";
-import { initialState, reducer } from "./cast-reducer";
+import { initialState, reducer, type CastState } from "./cast-reducer";
+import { forgetGeneration, pendingGeneration, rememberGeneration } from "./resumable";
 
 /** How long changed fields glow after an AI revision. */
 const HIGHLIGHT_MS = 2400;
 
+/** After a reload on /generating the generation the reload interrupted goes on; anywhere else it is dropped. */
+function resumedState(pathname: string): CastState {
+  const pending = pendingGeneration();
+  if (!pending) return initialState;
+  if (pathname !== paths.generating) {
+    forgetGeneration();
+    return initialState;
+  }
+  return { ...initialState, premise: pending.premise, generation: pending.answered ? "ready" : "running" };
+}
+
 export function CastProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const navigate = useNavigate();
   const location = useLocation();
+  const [state, dispatch] = useReducer(reducer, location.pathname, resumedState);
+  const navigate = useNavigate();
   const { showError, dismissError } = useErrors();
 
   const stateRef = useRef(state);
@@ -38,37 +51,61 @@ export function CastProvider({ children }: { children: ReactNode }) {
   // ---------- generation ----------
 
   const generation = useRef<AbortController | null>(null);
+  const unloading = useUnloading();
+
+  /** Asks the api for a cast; remembered in the tab, so a reload in between asks again. */
+  const requestCast = useCallback(
+    async (premise: string) => {
+      generation.current?.abort();
+      const controller = new AbortController();
+      generation.current = controller;
+      rememberGeneration({ premise, answered: false });
+      try {
+        const { characters, cards } = await api.generateCast(premise, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        rememberGeneration({ premise, answered: true });
+        // the generating page plays the result phase and then calls finishGeneration
+        dispatch({ type: "castGenerated", characters, cards });
+      } catch (error) {
+        // a reload cancelled it: it stays remembered and starts again on the next load
+        if (isAbort(error) || controller.signal.aborted || unloading.current) return;
+        forgetGeneration();
+        dispatch({ type: "generationEnded" });
+        navigate(paths.prompt);
+        showError(error);
+      } finally {
+        if (generation.current === controller) generation.current = null;
+      }
+    },
+    [navigate, showError, unloading],
+  );
 
   const startGeneration = useCallback(async () => {
-    generation.current?.abort();
-    const controller = new AbortController();
-    generation.current = controller;
     dismissError();
     dispatch({ type: "generationStarted" });
     navigate(paths.generating);
-    try {
-      const { characters, cards } = await api.generateCast(stateRef.current.premise, { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      // the generating page plays the result phase and then calls finishGeneration
-      dispatch({ type: "castGenerated", characters, cards });
-    } catch (error) {
-      if (isAbort(error) || controller.signal.aborted) return;
-      dispatch({ type: "generationEnded" });
-      navigate(paths.prompt);
-      showError(error);
-    } finally {
-      if (generation.current === controller) generation.current = null;
-    }
-  }, [navigate, showError, dismissError]);
+    await requestCast(stateRef.current.premise);
+  }, [navigate, dismissError, requestCast]);
+
+  // After a reload on /generating: ask again for the cast the reload cancelled.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current) return;
+    resumed.current = true;
+    const { generation: status, premise } = stateRef.current;
+    if (status === "running") void requestCast(premise);
+  }, [requestCast]);
 
   const cancelGeneration = useCallback(() => {
     generation.current?.abort();
     generation.current = null;
+    forgetGeneration();
     dispatch({ type: "generationEnded" });
     navigate(paths.prompt);
   }, [navigate]);
 
   const finishGeneration = useCallback(() => {
+    forgetGeneration();
     dispatch({ type: "generationEnded" });
     navigate(paths.cast);
   }, [navigate]);

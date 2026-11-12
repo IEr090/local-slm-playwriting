@@ -41,7 +41,7 @@ export const initialState: StoryState = {
   chats: {},
   typing: null,
   highlight: [],
-  chatOpen: true,
+  chatOpen: false,
   draft: "",
   editingScenes: [],
 };
@@ -59,6 +59,7 @@ export type Action =
   | { type: "sceneTextsEdited"; number: number; sceneTexts: SceneText[] }
   | { type: "placesReceived"; places: Place[] }
   | { type: "toggleChat" }
+  | { type: "chatClosed" }
   | { type: "setDraft"; draft: string }
   | { type: "chatLoaded"; key: ChatKey; messages: ChatBubble[] }
   | { type: "chatCleared"; key: ChatKey }
@@ -115,6 +116,8 @@ export function reducer(state: StoryState, action: Action): StoryState {
       return withStory(state, (story) => ({ ...story, places: action.places }));
     case "toggleChat":
       return { ...state, chatOpen: !state.chatOpen };
+    case "chatClosed":
+      return { ...state, chatOpen: false };
     case "setDraft":
       return { ...state, draft: action.draft };
     case "chatLoaded":

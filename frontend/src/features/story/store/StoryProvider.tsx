@@ -144,6 +144,11 @@ export function StoryProvider({ children }: { children: ReactNode }) {
 
   // ---------- chat ----------
 
+  // Every page opens with the chat closed; the user opens it with the button in the header.
+  useEffect(() => {
+    dispatch({ type: "chatClosed" });
+  }, [location.pathname]);
+
   const chatOpened = useCallback(
     (key: ChatKey) => {
       if (stateRef.current.chats[key] || historyRequested.current.has(key)) return;
